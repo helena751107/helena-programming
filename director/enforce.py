@@ -96,6 +96,14 @@ def enforce_actions(actions_log: dict, policy: dict) -> list[str]:
         errs.append("cursor_highlight not enabled in shoot")
     if req.get("show_caption_bar") and not actions_log.get("caption_bar"):
         errs.append("caption_bar not enabled in shoot")
+    if req.get("show_spotlight") and not actions_log.get("spotlight"):
+        errs.append("spotlight/focus ring not used in shoot")
+    if req.get("min_overlay_version") and (
+        (actions_log.get("overlay_version") or 0) < req["min_overlay_version"]
+    ):
+        errs.append(
+            f"overlay_version {actions_log.get('overlay_version')} < {req['min_overlay_version']}"
+        )
     if req.get("page_ready_contract") and not actions_log.get("page_ready"):
         errs.append("page_ready contract not logged")
     fails = actions_log.get("failed_clicks") or []

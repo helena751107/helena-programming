@@ -25,6 +25,8 @@
     "show_cursor_highlight": true,
     "show_caption_bar": true,
     "show_progress_chip": true,
+    "show_spotlight": true,
+    "min_overlay_version": 2,
     "expand_all_before_tour": true,
     "page_ready_contract": true,
     "lead_black_max_sec": 0.35,

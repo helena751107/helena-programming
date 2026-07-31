@@ -36,7 +36,11 @@ DIR = Path(__file__).resolve().parent
 DEFAULT_OUT = DIR / "out" / "director_out.mp4"
 VOICE_DEFAULT = "ko-KR-SunHiNeural"
 # Encode quality (phone-friendly but not ultrafast mush)
-X264 = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-crf", "20"]
+X264 = [
+    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+    "-preset", "veryfast", "-crf", "20",
+    "-r", "30", "-vsync", "cfr",
+]
 
 
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -182,9 +186,11 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
         "cursor_highlight": True,
         "caption_bar": True,
         "progress_chip": True,
+        "spotlight": False,
         "successful_clicks": 0,
         "failed_clicks": [],
         "events": [],
+        "overlay_version": 2,
     }
     print(f"[shoot] open {url}", flush=True)
 
@@ -273,7 +279,32 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
             page.wait_for_timeout(380)
             return True
 
-        def do_clicks(clicks: list) -> None:
+        def resolve_el(part: str):
+            loc = page.locator(part).first
+            if loc.count() == 0:
+                return None, None
+            return loc, part
+
+        def healer_variants(sel: str) -> list[str]:
+            """Community pattern: retry simpler selectors (healer)."""
+            parts = [s.strip() for s in sel.split(",") if s.strip()]
+            out = list(parts)
+            for p in parts:
+                if "#" in p and " > " in p:
+                    # last id-ish fragment
+                    out.append(p.split(" > ")[-1])
+                if p.startswith("#") and "-" in p:
+                    out.append(p)  # keep
+            # dedupe
+            seen = set()
+            uniq = []
+            for x in out:
+                if x not in seen:
+                    seen.add(x)
+                    uniq.append(x)
+            return uniq
+
+        def do_clicks(clicks: list, why_label: str) -> None:
             for c in clicks or []:
                 sel = c.get("selector")
                 optional = bool(c.get("optional", False))
@@ -281,29 +312,32 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
                     continue
                 ok = False
                 err = None
-                for part in [s.strip() for s in sel.split(",")]:
+                label = (c.get("why") or why_label or "Click")[:24]
+                for part in healer_variants(sel):
                     try:
-                        loc = page.locator(part).first
-                        if loc.count() == 0:
+                        loc, used = resolve_el(part)
+                        if not loc:
                             continue
                         loc.scroll_into_view_if_needed(timeout=2500)
-                        page.wait_for_timeout(200)
-                        # move tutorial cursor then pulse-click
+                        page.wait_for_timeout(180)
+                        # Pro sequence: spotlight → cursor → ripple → click
                         page.evaluate(
-                            """(part) => {
+                            """([part, label]) => {
                               const el = document.querySelector(part);
-                              if (window.__hd && el) return window.__hd.moveCursorTo(el);
+                              if (window.__hd && el) return window.__hd.demoClick(el, label);
                             }""",
-                            part,
+                            [part, label],
                         )
                         page.wait_for_timeout(100)
-                        page.evaluate("() => window.__hd && window.__hd.pulse()")
                         loc.click(timeout=3000, force=True)
-                        page.wait_for_timeout(550)
+                        page.wait_for_timeout(480)
                         ok = True
-                        print(f"  click OK {part}", flush=True)
+                        print(f"  click OK {used}", flush=True)
                         actions["successful_clicks"] += 1
-                        actions["events"].append({"type": "click", "selector": part, "ok": True})
+                        actions["spotlight"] = True
+                        actions["events"].append({
+                            "type": "click", "selector": used, "ok": True, "label": label
+                        })
                         break
                     except Exception as e:
                         err = str(e)
@@ -313,9 +347,8 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
                         {"selector": sel, "optional": optional, "error": err}
                     )
                     actions["events"].append({"type": "click", "selector": sel, "ok": False})
-                    if not optional:
-                        # hard fail later via enforce; keep going to collect evidence
-                        pass
+                else:
+                    page.evaluate("() => window.__hd && window.__hd.clearFocus()")
 
         n = max(1, len(beats))
         for i, b in enumerate(beats):
@@ -323,32 +356,53 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
             action = cam.get("action", "scroll_to")
             cap = b.get("caption") or b.get("id")
             page.evaluate(
-                """([cap, p, chip]) => {
+                """([cap, p, chip, kicker]) => {
                   if (!window.__hd) return;
-                  window.__hd.setCaption(cap);
+                  window.__hd.setCaption(cap, kicker);
                   window.__hd.setProgress(p);
                   window.__hd.setChip(chip);
                 }""",
-                [cap, (i + 1) / n, f"{i+1}/{n} · TUTORIAL"],
+                [cap, (i + 1) / n, f"{i+1}/{n} · PRODUCT TOUR", f"STEP {i+1}/{n}"],
             )
             print(f"[shoot] beat {b['id']} action={action} hold={timings[i]:.1f}s", flush=True)
             if action == "goto_top":
                 page.evaluate("window.scrollTo({top:0,behavior:'instant'})")
-                page.wait_for_timeout(450)
+                page.wait_for_timeout(500)
+                # spotlight cover hero if present
+                page.evaluate(
+                    """() => {
+                      const el = document.querySelector('#cover h1, .cover h1, h1');
+                      if (window.__hd && el) return window.__hd.focus(el, 'Hero');
+                    }"""
+                )
+                page.wait_for_timeout(400)
+                actions["spotlight"] = True
             elif action == "scroll_to" and cam.get("selector"):
                 smooth_scroll_to(cam["selector"])
-            do_clicks(b.get("clicks") or [])
-            # hold for VO — keep caption visible
-            page.wait_for_timeout(int(max(1.4, timings[i]) * 1000))
+                page.evaluate(
+                    """(sel) => {
+                      const el = document.querySelector(sel);
+                      if (window.__hd && el) return window.__hd.focus(el, 'Section');
+                    }""",
+                    cam["selector"],
+                )
+                page.wait_for_timeout(350)
+                actions["spotlight"] = True
+            do_clicks(b.get("clicks") or [], b.get("caption") or "Action")
+            # deliberate pace (Screen Studio style)
+            page.wait_for_timeout(int(max(1.6, timings[i]) * 1000))
+            page.evaluate("() => window.__hd && window.__hd.clearFocus()")
 
         page.evaluate(
             """() => {
               if (!window.__hd) return;
-              window.__hd.setCaption('Tutorial complete');
+              window.__hd.clearFocus();
+              window.__hd.setCaption('Tour complete — try it yourself', 'DONE');
               window.__hd.setProgress(1);
+              window.__hd.setChip('COMPLETE');
             }"""
         )
-        page.wait_for_timeout(700)
+        page.wait_for_timeout(900)
         context.close()
         browser.close()
 
