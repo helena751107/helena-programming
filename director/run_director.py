@@ -22,6 +22,8 @@ import sys
 import time
 from pathlib import Path
 
+from intro import make_intro_card
+from quality import gate_output, trim_leading_black
 from scout import (
     merge_scenario_with_scout,
     save_scout,
@@ -32,6 +34,8 @@ from scout import (
 DIR = Path(__file__).resolve().parent
 DEFAULT_OUT = DIR / "out" / "director_out.mp4"
 VOICE_DEFAULT = "ko-KR-SunHiNeural"
+# Encode quality (phone-friendly but not ultrafast mush)
+X264 = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-crf", "20"]
 
 
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -124,92 +128,98 @@ def concat_audio(beats: list[dict], work: Path) -> Path:
     return out
 
 
-def make_intro_card(work: Path, title: str, subtitle: str, seconds: float = 2.5) -> Path:
-    """Simple branded title card (no external assets)."""
-    out = work / "intro_card.mp4"
-    # escape for drawtext
-    def esc(s: str) -> str:
-        return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-
-    # Use Korean-capable font if present
-    font_candidates = [
-        "/usr/share/fonts/truetype/noto/NotoSansKR-Regular.otf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    font = next((f for f in font_candidates if Path(f).exists()), None)
-    font_opt = f":fontfile={font}" if font else ""
-
-    vf = (
-        f"drawtext=text='{esc(title)}'{font_opt}:fontsize=42:fontcolor=0xF4EFE6:"
-        f"x=(w-text_w)/2:y=(h/2)-40,"
-        f"drawtext=text='{esc(subtitle)}'{font_opt}:fontsize=22:fontcolor=0x3DB8A8:"
-        f"x=(w-text_w)/2:y=(h/2)+20"
-    )
-    run([
-        "ffmpeg", "-y",
-        "-f", "lavfi", "-i", f"color=c=0x0A0908:s=720x1280:d={seconds}",
-        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-        "-vf", vf,
-        "-t", str(seconds),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-crf", "28",
-        "-c:a", "aac", "-shortest",
-        str(out),
-    ])
-    return out
+def _wait_page_ready(page, url: str) -> None:
+    """Hard readiness contract — no shooting until paint + fonts."""
+    page.goto(url, wait_until="load", timeout=120_000)
+    try:
+        page.wait_for_load_state("networkidle", timeout=25_000)
+    except Exception:
+        print("  ! networkidle timeout — continue after load", flush=True)
+    # first contentful anchors
+    for sel in ("#cover h1", ".cover h1", "h1", "main", "body"):
+        try:
+            page.wait_for_selector(sel, state="visible", timeout=8_000)
+            break
+        except Exception:
+            continue
+    page.evaluate("""async () => {
+      try { await document.fonts.ready; } catch (e) {}
+      // force layout/paint
+      document.body && document.body.getBoundingClientRect();
+      window.scrollTo(0, 0);
+    }""")
+    page.wait_for_timeout(600)
+    # paint dark bg explicitly if blank flash
+    page.add_style_tag(content="""
+      html,body{background:#0a0908!important}
+      .cursor,.cursor-dot{display:none!important}
+      body{cursor:auto!important}
+      html{scroll-behavior:auto!important}
+    """)
+    page.wait_for_timeout(200)
 
 
 def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
+    """
+    Two-phase shoot (pro):
+      1) Warm context — load & ready WITHOUT counting as final (still recorded
+         but we trim black in edit). Maximize first-paint before tour.
+      2) Tour with timed holds matching narration.
+    """
     from playwright.sync_api import sync_playwright
 
     vp = scenario.get("viewport") or {"width": 720, "height": 1280}
+    w, h = int(vp["width"]), int(vp["height"])
     url = scenario["url"]
     rec_dir = work / "record"
     if rec_dir.exists():
         shutil.rmtree(rec_dir)
     rec_dir.mkdir(parents=True)
 
-    # Precompute per-beat on-screen times (audio + pad)
-    timings = []
-    for b in beats:
-        timings.append(b["audio_sec"] + b.get("pad_sec", 0.4))
-
+    timings = [b["audio_sec"] + b.get("pad_sec", 0.4) for b in beats]
     print(f"[shoot] open {url}", flush=True)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-gpu",
                 "--hide-scrollbars",
+                "--font-render-hinting=none",
             ],
         )
         context = browser.new_context(
-            viewport={"width": int(vp["width"]), "height": int(vp["height"])},
+            viewport={"width": w, "height": h},
             device_scale_factor=1,
             record_video_dir=str(rec_dir),
-            record_video_size={"width": int(vp["width"]), "height": int(vp["height"])},
+            record_video_size={"width": w, "height": h},
             color_scheme="dark",
             locale="ko-KR",
+            # reduce blank: start with dark
+            reduced_motion="reduce",
         )
         page = context.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=120_000)
-        page.wait_for_timeout(2000)
-        # hide custom cursor if any
-        page.add_style_tag(content="""
-          .cursor,.cursor-dot{display:none!important}
-          body{cursor:auto!important}
-          html{scroll-behavior:auto!important}
-        """)
-        # expand all — prefer scout-discovered selector
+        # seed dark blank
+        page.set_content(
+            "<!doctype html><html><body style='margin:0;background:#0a0908;width:100vw;height:100vh'></body></html>"
+        )
+        page.wait_for_timeout(150)
+
+        _wait_page_ready(page, url)
+        print("  page ready", flush=True)
+
+        # settle frame for first keyframe (anti-black head)
+        page.evaluate("window.scrollTo(0,0)")
+        page.wait_for_timeout(800)
+
         expand_sels = []
         if scenario.get("expand_all_selector"):
             expand_sels.append(scenario["expand_all_selector"])
         expand_sels += [
             "#accExpand", "#accOpenAll",
-            "button:has-text('Expand')", "button:has-text('펼치')",
-            "button:has-text('모두 펼치')",
+            "button:has-text('Expand all')", "button:has-text('Expand')",
+            "button:has-text('펼치')", "button:has-text('모두 펼치')",
         ]
         for sel in expand_sels:
             try:
@@ -222,7 +232,7 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
             except Exception:
                 pass
 
-        def smooth_scroll_to(selector: str, steps: int = 12):
+        def smooth_scroll_to(selector: str, steps: int = 16):
             try:
                 page.wait_for_selector(selector, timeout=8000)
             except Exception:
@@ -250,7 +260,7 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
                 }""",
                 [selector, steps],
             )
-            page.wait_for_timeout(350)
+            page.wait_for_timeout(400)
 
         def try_clicks(clicks: list):
             for c in clicks or []:
@@ -258,7 +268,6 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
                 optional = c.get("optional", True)
                 if not sel:
                     continue
-                # try comma-separated selectors
                 ok = False
                 for part in [s.strip() for s in sel.split(",")]:
                     try:
@@ -266,8 +275,9 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
                         if loc.count() == 0:
                             continue
                         loc.scroll_into_view_if_needed(timeout=2000)
+                        # accordion: click head even if expanded toggle
                         loc.click(timeout=2500, force=True)
-                        page.wait_for_timeout(450)
+                        page.wait_for_timeout(500)
                         ok = True
                         print(f"  click {part}", flush=True)
                         break
@@ -282,23 +292,21 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
             action = cam.get("action", "scroll_to")
             print(f"[shoot] beat {b['id']} action={action} hold={timings[i]:.1f}s", flush=True)
             if action == "goto_top":
-                page.evaluate("window.scrollTo(0,0)")
-                page.wait_for_timeout(400)
+                page.evaluate("window.scrollTo({top:0,behavior:'instant'})")
+                page.wait_for_timeout(500)
             elif action == "scroll_to" and cam.get("selector"):
                 smooth_scroll_to(cam["selector"])
             try_clicks(b.get("clicks") or [])
-            # hold for narration length
-            page.wait_for_timeout(int(timings[i] * 1000))
+            # hold for narration — min 1.2s visual settle
+            page.wait_for_timeout(int(max(1.2, timings[i]) * 1000))
 
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(600)
         context.close()
         browser.close()
 
-    videos = list(rec_dir.glob("*.webm"))
+    videos = sorted(rec_dir.glob("*.webm"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not videos:
         raise RuntimeError("No Playwright video recorded")
-    # newest / only
-    videos.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     raw = videos[0]
     print(f"[shoot] raw video {raw} ({raw.stat().st_size} bytes)", flush=True)
     return raw
@@ -306,49 +314,61 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
 
 def edit(raw_video: Path, narration: Path, intro: Path | None, out: Path, work: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
-    # re-encode page video to mp4
-    page_mp4 = work / "page.mp4"
+    page_raw = work / "page_raw.mp4"
     run([
         "ffmpeg", "-y", "-i", str(raw_video),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-crf", "28",
-        "-an",
-        str(page_mp4),
+        *X264, "-an", str(page_raw),
     ])
+
+    # C2/C3 — strip Playwright lead black
+    page_mp4 = work / "page.mp4"
+    _, trimmed = trim_leading_black(page_raw, page_mp4)
+    print(f"[edit] lead trim={trimmed:.2f}s", flush=True)
+
     v_dur = ffprobe_duration(page_mp4)
     a_dur = ffprobe_duration(narration)
     print(f"[edit] video={v_dur:.2f}s audio={a_dur:.2f}s", flush=True)
 
-    # mux page + narration (shortest)
+    # If video still shorter than audio (after trim), freeze last frame
     body = work / "body.mp4"
-    run([
-        "ffmpeg", "-y",
-        "-i", str(page_mp4),
-        "-i", str(narration),
-        "-c:v", "copy",
-        "-c:a", "aac", "-b:a", "128k",
-        "-shortest",
-        "-movflags", "+faststart",
-        str(body),
-    ])
+    if v_dur + 0.3 < a_dur:
+        pad = a_dur - v_dur + 0.15
+        print(f"[edit] pad last frame +{pad:.2f}s for audio", flush=True)
+        run([
+            "ffmpeg", "-y",
+            "-i", str(page_mp4),
+            "-i", str(narration),
+            "-filter_complex",
+            f"[0:v]tpad=stop_mode=clone:stop_duration={pad:.3f}[v]",
+            "-map", "[v]", "-map", "1:a",
+            *X264, "-c:a", "aac", "-b:a", "128k",
+            "-shortest", "-movflags", "+faststart",
+            str(body),
+        ])
+    else:
+        run([
+            "ffmpeg", "-y",
+            "-i", str(page_mp4),
+            "-i", str(narration),
+            "-map", "0:v", "-map", "1:a",
+            *X264, "-c:a", "aac", "-b:a", "128k",
+            "-shortest", "-movflags", "+faststart",
+            str(body),
+        ])
 
     if intro and intro.exists():
-        # scale intro to same size and concat
         intro_n = work / "intro_norm.mp4"
-        run([
-            "ffmpeg", "-y", "-i", str(intro),
-            "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-crf", "28",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            str(intro_n),
-        ])
         body_n = work / "body_norm.mp4"
+        vf = "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1"
         run([
-            "ffmpeg", "-y", "-i", str(body),
-            "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-crf", "28",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            str(body_n),
+            "ffmpeg", "-y", "-i", str(intro), "-vf", vf,
+            *X264, "-c:a", "aac", "-ar", "44100", "-ac", "2", str(intro_n),
         ])
+        run([
+            "ffmpeg", "-y", "-i", str(body), "-vf", vf,
+            *X264, "-c:a", "aac", "-ar", "44100", "-ac", "2", str(body_n),
+        ])
+        # xfade-ish hard cut is fine; ensure both have audio
         concat_list = work / "vconcat.txt"
         concat_list.write_text(
             f"file '{intro_n.resolve()}'\nfile '{body_n.resolve()}'\n",
@@ -514,14 +534,17 @@ def main():
     print(f"narration total {ffprobe_duration(narration):.1f}s", flush=True)
 
     intro = None
+    intro_png = None
     if not args.skip_intro:
-        print("\n[1b] INTRO CARD", flush=True)
+        print("\n[1b] INTRO CARD (HTML/CJK)", flush=True)
         intro = make_intro_card(
             work,
             scenario.get("title") or "Helena",
-            scenario.get("logline") or scenario.get("url", "")[:48],
-            2.4,
+            scenario.get("logline") or (scenario.get("url") or "")[:80],
+            seconds=2.2,
+            kicker="Director · Scout → Shoot",
         )
+        intro_png = work / "intro.png"
 
     print("\n[2/5] SHOOT", flush=True)
     raw = shoot(scenario, beats, work)
@@ -529,14 +552,24 @@ def main():
     print("\n[3/5] EDIT", flush=True)
     out = edit(raw, narration, intro, args.out, work)
 
-    print("\n[4/5] REPORT", flush=True)
+    print("\n[4/5] QUALITY GATE", flush=True)
+    gate = gate_output(out, work=work / "gate", intro_png=intro_png)
+    if not gate.get("pass"):
+        print("QUALITY GATE FAILED — refuse to treat as shippable", flush=True)
+        # still write report for debug
+        write_report(scenario, beats, out, work)
+        shutil.copy(work / "scenario.json", out.with_suffix(".scenario.json"))
+        sys.exit(2)
+
+    print("\n[5/5] REPORT", flush=True)
     report = write_report(scenario, beats, out, work)
-    # copy scenario next to out
     shutil.copy(work / "scenario.json", out.with_suffix(".scenario.json"))
     shutil.copy(report, out.with_suffix(".report.md"))
+    if (work / "gate" / "quality_report.json").exists():
+        shutil.copy(work / "gate" / "quality_report.json", out.with_suffix(".quality.json"))
 
     elapsed = time.time() - t0
-    print("\n=== DONE ===", flush=True)
+    print("\n=== DONE (SHIP) ===", flush=True)
     print(f"out: {out}", flush=True)
     print(f"dur: {ffprobe_duration(out):.1f}s  size: {out.stat().st_size // 1024}KB  time: {elapsed:.0f}s", flush=True)
     print(f"report: {report}", flush=True)

@@ -225,35 +225,34 @@ def scout_url(url: str, viewport: dict | None = None, work: Path | None = None) 
 
 
 def _narrate_section(sec: dict, is_first: bool, is_last: bool, site_title: str) -> str:
-    """Rule-based writer from scout text (no LLM required on-device)."""
+    """Rule-based writer — short beats (≤ ~11s spoken). Quality: no monologue."""
     h = (sec.get("heading") or sec.get("id") or "이 구간").strip()
-    # strip huge headings
-    h = re.sub(r"\s+", " ", h)[:60]
+    h = re.sub(r"\s+", " ", h)[:40]
     deck = (sec.get("deck") or "").strip()
     preview = (sec.get("text_preview") or "").strip()
-    # pick a short supporting line
-    support = deck or preview
-    support = re.sub(r"\s+", " ", support)
-    # avoid repeating heading
+    support = re.sub(r"\s+", " ", deck or preview)
     if support.startswith(h):
         support = support[len(h):].strip(" ·—-")
-    support = support[:120]
+    support = support[:72]
     bits = []
     if is_first:
-        bits.append(f"{site_title or '이 사이트'}를 소개합니다.")
-    bits.append(f"{h}.")
+        bits.append(f"{site_title or '이 사이트'}.")
+    bits.append(h if h.endswith(("다", "요", ".")) else f"{h}.")
     if support:
-        bits.append(support if support.endswith(("다", "요", ".", "다.")) else support + ".")
-    if sec.get("has_diagram"):
-        bits.append("다이어그램과 인포그래픽으로 구조를 보여 줍니다.")
-    if sec.get("has_accordion"):
-        bits.append("접힌 섹션을 열어 내용을 확인합니다.")
+        if not re.search(r"[.다요]$", support):
+            support = support.rstrip("., ") + "."
+        bits.append(support)
+    if sec.get("has_diagram") and len(" ".join(bits)) < 70:
+        bits.append("구조를 그림으로 봅니다.")
+    if sec.get("has_accordion") and len(" ".join(bits)) < 85:
+        bits.append("열어 확인합니다.")
     if is_last:
-        bits.append("핵심을 따라온 소개였습니다.")
-    text = " ".join(bits)
-    # light cleanup double periods
+        bits.append("여기까지 소개였습니다.")
+    text = re.sub(r"\s+", " ", " ".join(bits)).strip()
     text = re.sub(r"\.\.+", ".", text)
-    text = re.sub(r"\s+", " ", text).strip()
+    # hard cap ~90 Korean chars ≈ 10–12s
+    if len(text) > 95:
+        text = text[:93].rstrip() + "."
     return text
 
 
