@@ -52,14 +52,25 @@ def ffprobe_duration(path: Path) -> float:
     return float(r.stdout.strip() or "0")
 
 
-async def tts_beat(text: str, voice: str, dest: Path) -> float:
+async def tts_beat(text: str, voice: str, dest: Path, retries: int = 4) -> float:
     import edge_tts
     dest.parent.mkdir(parents=True, exist_ok=True)
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(str(dest))
-    if dest.stat().st_size < 100:
-        raise RuntimeError(f"TTS empty: {dest}")
-    return ffprobe_duration(dest)
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            if dest.exists():
+                dest.unlink()
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save(str(dest))
+            if dest.stat().st_size < 100:
+                raise RuntimeError(f"TTS empty: {dest}")
+            return ffprobe_duration(dest)
+        except Exception as e:
+            last_err = e
+            wait = min(8, attempt * 2)
+            print(f"  ! tts retry {attempt}/{retries}: {e} (sleep {wait}s)", flush=True)
+            await asyncio.sleep(wait)
+    raise RuntimeError(f"TTS failed after {retries} tries: {last_err}")
 
 
 def build_voices(scenario: dict, work: Path) -> list[dict]:
