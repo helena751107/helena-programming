@@ -131,25 +131,35 @@ def parse_html(html: str) -> list:
 
 
 # ── 템플릿 ──
-TEMPLATE_DARK = '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><style>
+TEMPLATE_DARK = '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Noto Sans KR','Apple SD Gothic Neo',system-ui,sans-serif;
-  background:linear-gradient(180deg,#0f172a 0%,#1e1a3a 50%,#0f172a 100%);
-  color:#e2e8f0;width:{width}px;min-height:{height}px;padding:60px 50px;
-  display:flex;flex-direction:column;justify-content:center}}
-.progress{{font-size:14px;color:{accent};margin-bottom:30px;letter-spacing:2px}}
-h1{{font-size:38px;line-height:1.3;margin-bottom:40px;color:#f8fafc;font-weight:700}}
-h1 .accent{{color:{accent}}}
-p{{font-size:22px;line-height:1.8;margin-bottom:16px;color:#cbd5e1}}
-.page-num{{position:fixed;bottom:40px;right:50px;font-size:14px;color:#475569}}
-.bar{{position:fixed;bottom:50px;left:50px;right:50px;height:2px;background:#1e293b;border-radius:1px}}
-.bar-fill{{height:100%;background:{accent};width:{pct}%;border-radius:1px}}
-.logo{{position:fixed;top:40px;right:50px;font-size:12px;color:#475569;letter-spacing:1px}}
+body{{font-family:'Inter','Noto Sans KR',system-ui,sans-serif;
+  background:linear-gradient(160deg,#050510 0%,#0a0a20 40%,#0f0720 100%);
+  color:#e8e8f0;width:{width}px;min-height:{height}px;padding:80px 55px;
+  display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}}
+body::before{{content:'';position:fixed;top:-200px;left:-100px;width:500px;height:500px;
+  background:radial-gradient(circle,rgba(99,102,241,0.06),transparent 70%);border-radius:50%;pointer-events:none}}
+body::after{{content:'';position:fixed;bottom:-150px;right:-100px;width:400px;height:400px;
+  background:radial-gradient(circle,rgba(244,114,182,0.04),transparent 70%);border-radius:50%;pointer-events:none}}
+.slide-num{{font-size:13px;font-weight:600;letter-spacing:0.15em;color:{accent};margin-bottom:24px}}
+.glass{{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:20px;
+  padding:32px;margin-bottom:20px}}
+h1{{font-size:38px;line-height:1.25;font-weight:800;letter-spacing:-0.03em;margin-bottom:12px;
+  background:linear-gradient(135deg,#e8e8f0,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+p{{font-size:21px;line-height:1.75;color:rgba(255,255,255,0.65);margin-bottom:10px}}
+.page-num{{position:fixed;bottom:35px;right:55px;font-size:12px;color:rgba(255,255,255,0.25);font-weight:500}}
+.bar{{position:fixed;bottom:45px;left:55px;right:55px;height:2px;background:rgba(255,255,255,0.05);border-radius:1px}}
+.bar-fill{{height:100%;background:linear-gradient(90deg,{accent},#c084fc);width:{pct}%;border-radius:1px}}
+.logo{{position:fixed;top:35px;right:55px;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:0.1em;font-weight:600}}
 </style></head><body>
 <div class="logo">HELENA STUDIO</div>
-<div class="progress">SECTION {n} / {total}</div>
-<h1><span class="accent">{title}</span></h1>
+<div class="slide-num">SECTION {n} / {total}</div>
+<div class="glass">
+<h1>{title}</h1>
 {body_html}
+</div>
 <div class="page-num">{n}/{total}</div>
 <div class="bar"><div class="bar-fill"></div></div>
 </body></html>'''
