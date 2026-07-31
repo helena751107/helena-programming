@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#4f46e5">
+<title>Audio Stitch — 오디오 이어붙이기</title>
+<style>
+:root { --bg:#0f172a; --surface:#1e293b; --border:#334155; --text:#e2e8f0;
+  --muted:#64748b; --accent:#6366f1; --accent2:#818cf8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text);
+  min-height:100vh; padding:1rem; }
+h1 { font-size:1.5rem; margin-bottom:.5rem; }
+.sub { color:var(--muted); font-size:.85rem; margin-bottom:1.5rem; }
+
+.toolbar { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+.btn { padding:.6rem 1rem; border:none; border-radius:8px; cursor:pointer;
+  font-size:.85rem; font-weight:600; transition:opacity .2s; }
+.btn:active { opacity:.7; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-outline { background:var(--surface); color:var(--text); border:1px solid var(--border); }
+.btn-danger { background:#dc2626; color:#fff; }
+.btn-success { background:#16a34a; color:#fff; }
+
+.clip-list { display:flex; flex-direction:column; gap:.5rem; min-height:100px;
+  background:var(--surface); border-radius:12px; padding:.5rem; border:1px solid var(--border); }
+.clip-item { display:flex; align-items:center; gap:.75rem; padding:.75rem;
+  background:var(--bg); border-radius:8px; border:1px solid var(--border);
+  transition:border-color .2s; }
+.clip-item:hover { border-color:var(--accent2); }
+.clip-num { font-size:.75rem; color:var(--muted); min-width:1.5rem; text-align:right; }
+.clip-name { flex:1; font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.clip-dur { font-size:.75rem; color:var(--muted); min-width:3rem; text-align:right; }
+.clip-actions { display:flex; gap:.25rem; }
+.clip-btn { background:none; border:none; color:var(--muted); cursor:pointer;
+  padding:.25rem .5rem; border-radius:4px; font-size:.75rem; }
+.clip-btn:hover { color:var(--text); background:var(--surface); }
+.clip-btn.del:hover { color:#f87171; }
+
+.empty { text-align:center; padding:2rem; color:var(--muted); }
+.empty-icon { font-size:2rem; margin-bottom:.5rem; }
+.summary { margin-top:1rem; padding:.75rem; background:var(--surface); border-radius:8px;
+  font-size:.85rem; display:flex; justify-content:space-between; align-items:center; }
+#status { margin-top:.5rem; font-size:.8rem; color:var(--muted); min-height:1.2rem; }
+#status.success { color:#4ade80; }
+#status.error { color:#f87171; }
+audio { width:100%; margin-top:1rem; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<h1>🎧 Audio Stitch</h1>
+<p class="sub">오디오 클립 업로드 → 순서 조정 → 이어붙이기 (핸드폰 단독)</p>
+
+<div class="toolbar">
+  <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">+ 클립 추가</button>
+  <input type="file" id="fileInput" accept="audio/*" multiple hidden onchange="addClips(event)">
+  <button class="btn btn-outline" onclick="moveUp()">▲ 위로</button>
+  <button class="btn btn-outline" onclick="moveDown()">▼ 아래로</button>
+  <button class="btn btn-danger" onclick="removeSelected()">✕ 삭제</button>
+  <button class="btn btn-primary" id="stitchBtn" onclick="stitchAll()" disabled>🔗 이어붙이기</button>
+  <button class="btn btn-success" id="downloadBtn" onclick="downloadResult()" disabled>📥 다운로드</button>
+</div>
+
+<div class="clip-list" id="clipList">
+  <div class="empty"><div class="empty-icon">🎵</div>클립을 추가하세요<br><small>MP3, WAV 지원</small></div>
+</div>
+
+<div class="summary hidden" id="summary">
+  <span id="summaryText"></span>
+  <span id="totalDur"></span>
+</div>
+<div id="status"></div>
+<audio id="preview" class="hidden" controls></audio>
+
+<script>
+const state = { clips:[], selected:-1, result:null };
+let nextId = 0;
+
+function addClips(e) {
+  const files = Array.from(e.target.files);
+  files.forEach(f => {
+    const a = new Audio();
+    a.src = URL.createObjectURL(f);
+    a.onloadedmetadata = () => {
+      state.clips.push({ id:nextId++, file:f, url:a.src, name:f.name, dur:a.duration });
+      render();
+    };
+  });
+  e.target.value = '';
+}
+
+function render() {
+  const list = document.getElementById('clipList');
+  if (!state.clips.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">🎵</div>클립을 추가하세요</div>';
+  } else {
+    list.innerHTML = state.clips.map((c,i) => `
+      <div class="clip-item${state.selected===i?' style=border-color:var(--accent2)':''}" onclick="select(${i})">
+        <span class="clip-num">${i+1}</span>
+        <span class="clip-name">${c.name}</span>
+        <span class="clip-dur">${fmt(c.dur)}</span>
+        <div class="clip-actions">
+          <button class="clip-btn" onclick="event.stopPropagation();preview(${i})">▶</button>
+          <button class="clip-btn del" onclick="event.stopPropagation();remove(${i})">✕</button>
+        </div>
+      </div>`).join('');
+  }
+  updateSummary();
+}
+
+function select(i) { state.selected = i; render(); }
+function remove(i) { state.clips.splice(i,1); state.selected = Math.min(state.selected, state.clips.length-1); render(); }
+function removeSelected() { if (state.selected>=0) remove(state.selected); }
+function moveUp() { if (state.selected>0) { [state.clips[state.selected-1],state.clips[state.selected]] = [state.clips[state.selected],state.clips[state.selected-1]]; state.selected--; render(); } }
+function moveDown() { if (state.selected>=0 && state.selected<state.clips.length-1) { [state.clips[state.selected],state.clips[state.selected+1]] = [state.clips[state.selected+1],state.clips[state.selected]]; state.selected++; render(); } }
+
+function preview(i) {
+  const a = document.getElementById('preview');
+  a.src = state.clips[i].url; a.className=''; a.play();
+}
+
+function updateSummary() {
+  const el = document.getElementById('summary');
+  if (state.clips.length) {
+    el.classList.remove('hidden');
+    const total = state.clips.reduce((s,c)=>s+c.dur,0);
+    document.getElementById('summaryText').textContent = `${state.clips.length}개 클립`;
+    document.getElementById('totalDur').textContent = `총 ${fmt(total)}`;
+    document.getElementById('stitchBtn').disabled = false;
+  } else {
+    el.classList.add('hidden');
+    document.getElementById('stitchBtn').disabled = true;
+  }
+}
+
+async function stitchAll() {
+  if (!state.clips.length) return;
+  const btn = document.getElementById('stitchBtn');
+  btn.textContent = '⏳ 처리중...'; btn.disabled = true;
+  const status = document.getElementById('status');
+  status.textContent = 'FFmpeg 이어붙이는 중...'; status.className = '';
+
+  try {
+    // AudioContext로 클립 이어붙이기 (인브라우저)
+    const ctx = new AudioContext();
+    const buffers = [];
+    for (const c of state.clips) {
+      const resp = await fetch(c.url);
+      const buf = await resp.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(buf);
+      buffers.push(decoded);
+    }
+
+    const totalLen = buffers.reduce((s,b)=>s+b.length, 0);
+    const merged = ctx.createBuffer(buffers[0].numberOfChannels, totalLen, ctx.sampleRate);
+
+    let offset = 0;
+    for (const b of buffers) {
+      for (let ch=0; ch<b.numberOfChannels; ch++) {
+        merged.getChannelData(ch).set(b.getChannelData(ch), offset);
+      }
+      offset += b.length;
+    }
+
+    // WAV 변환
+    const wav = audioBufferToWav(merged);
+    state.result = new Blob([wav], {type:'audio/wav'});
+    state.resultUrl = URL.createObjectURL(state.result);
+
+    const preview = document.getElementById('preview');
+    preview.src = state.resultUrl; preview.className = ''; preview.play();
+
+    status.textContent = '✅ 이어붙이기 완료!'; status.className = 'success';
+    document.getElementById('downloadBtn').disabled = false;
+  } catch(e) {
+    status.textContent = '❌ ' + e.message; status.className = 'error';
+  }
+  btn.textContent = '🔗 이어붙이기'; btn.disabled = false;
+}
+
+function downloadResult() {
+  if (!state.result) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(state.result);
+  a.download = 'helena-stitch.wav';
+  a.click();
+}
+
+function audioBufferToWav(buffer) {
+  const numCh = buffer.numberOfChannels, sr = buffer.sampleRate;
+  const len = buffer.length * numCh * 2 + 44;
+  const arr = new ArrayBuffer(len), view = new DataView(arr);
+  writeStr(view,0,'RIFF'); view.setUint32(4, len-8, true); writeStr(view,8,'WAVE');
+  writeStr(view,12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,numCh,true); view.setUint32(24,sr,true);
+  view.setUint32(28,sr*numCh*2,true); view.setUint16(32,numCh*2,true); view.setUint16(34,16,true);
+  writeStr(view,36,'data'); view.setUint32(40,len-44,true);
+  let off=44;
+  for (let i=0;i<buffer.length;i++) {
+    for (let ch=0;ch<numCh;ch++) {
+      const s = Math.max(-1,Math.min(1,buffer.getChannelData(ch)[i]));
+      view.setInt16(off, s<0?s*0x8000:s*0x7FFF, true); off+=2;
+    }
+  }
+  return arr;
+}
+function writeStr(view,off,str) { for(let i=0;i<str.length;i++) view.setUint8(off+i,str.charCodeAt(i)); }
+
+function fmt(s) {
+  if (isNaN(s)) return '0:00';
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>

@@ -44,5 +44,44 @@
       "parksy-audio RVC 프리셋",
       "MCP export_video 파이프"
     ]
+  },
+  {
+    "id": "audio-stitch",
+    "name": "Audio Stitch",
+    "package": null,
+    "directory": "apps/audio-stitch",
+    "version": "0.1.0",
+    "status": "scaffold",
+    "download_active": false,
+    "category": "creative",
+    "overlay": false,
+    "description": "오디오 클립 업로드 → 순서 조정 → 이어붙이기 (인브라우저 AudioContext)",
+    "icon_emoji": "🎧",
+    "source_origin": "original",
+    "domains": ["on-device"],
+    "tech": "Pure HTML/JS, AudioContext API",
+    "planned_features": [
+      "Edge TTS로 클립 직접 생성",
+      "Web Audio API 페이드인/아웃",
+      "clip-shorts 연동"
+    ]
+  },
+  {
+    "id": "webpage-to-audiobook",
+    "name": "Webpage → Audiobook",
+    "package": null,
+    "directory": "scripts/webpage_to_audiobook.py",
+    "version": "0.1.0",
+    "status": "verified",
+    "download_active": false,
+    "category": "pipeline",
+    "overlay": false,
+    "description": "웹페이지 → 텍스트 추출 → Edge TTS → MP3 오디오북 (S21 단독, 무료)",
+    "icon_emoji": "📖",
+    "source_origin": "original",
+    "domains": ["on-device"],
+    "tech": "Python, edge-tts, ffmpeg",
+    "verified_on": "2026-07-31",
+    "verified_result": "46-fridge-architecture_Claude.md → 3.3MB MP3, 9.5분"
   }
 ]
