@@ -26,13 +26,14 @@ def capture_section_html(html_path: str, section_idx: int, output_png: str,
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": width, "height": height})
             page.goto(f"file://{html_path}", timeout=15000)
+            page.wait_for_load_state('networkidle')
+            page.wait_for_timeout(2000)
 
-            # Mermaid 렌더링 대기
-            page.wait_for_timeout(1500)
-
-            # 해당 섹션으로 이동
-            page.evaluate(f"showSection({section_idx})")
-            page.wait_for_timeout(500)
+            # 해당 섹션으로 스크롤
+            slides = page.query_selector_all('.slide')
+            if section_idx < len(slides):
+                slides[section_idx].scroll_into_view_if_needed()
+            page.wait_for_timeout(800)
 
             # 전체 페이지 스크린샷
             page.screenshot(path=output_png, full_page=False)

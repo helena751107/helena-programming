@@ -454,9 +454,9 @@ function esc(s){{const d=document.createElement('div');d.textContent=s;return d.
 
 
 def main():
-    ap = argparse.ArgumentParser(description=r"마크다운 → 프리미엄 인터랙티브 HTML")
-    ap.add_argument("source", help=".md 파일")
-    ap.add_argument("--output", "-o", help="출력 .html")
+    ap = argparse.ArgumentParser(description="Markdown -> premium interactive HTML")
+    ap.add_argument("source", help=".md file")
+    ap.add_argument("--output", "-o", help="output .html path")
     args = ap.parse_args()
 
     text = Path(args.source).read_text(encoding="utf-8", errors="replace")
