@@ -206,15 +206,13 @@ def gate_output(
     st0 = png_stats(f0)
     lead_black = blackdetect_lead(video)
     # after our trim, first frame should not be pure black
-    first_ok = bool(st0.get("complex")) or (
-        st0.get("black_ratio") is not None and st0["black_ratio"] < 0.9
-    ) or (st0.get("mean_y") is not None and st0["mean_y"] > 8)
-    # file size fallback
-    if st0.get("size", 0) > 30_000:
-        first_ok = True
+    # intro/card may be dark UI; require meaningful file size + not pure empty
+    first_ok = st0.get("size", 0) >= 80_000 or bool(st0.get("complex"))
+    if st0.get("mean_y") is not None and st0["mean_y"] < 3 and st0.get("size", 0) < 20_000:
+        first_ok = False
     c = {
         "id": "G2_lead_black",
-        "pass": first_ok and lead_black < 0.6,
+        "pass": first_ok and lead_black < 0.4,
         "detail": f"lead_black={lead_black:.2f}s frame0={st0}",
     }
     checks.append(c)

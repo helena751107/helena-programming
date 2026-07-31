@@ -1,0 +1,47 @@
+{
+  "id": "tutorial_v1",
+  "name": "Big-tech product tutorial (forced)",
+  "version": 1,
+  "description": "LLM 자유 연출 금지. 이 정책 미충족 시 렌더·TG 전송 불가.",
+  "mode": "bigtech_tutorial",
+  "require": {
+    "scout_before_write": true,
+    "intro_via_html_playwright": true,
+    "forbid_ffmpeg_drawtext_intro": true,
+    "min_beats": 4,
+    "max_beats": 7,
+    "max_narration_chars": 78,
+    "max_narration_sec": 11.0,
+    "min_narration_sec": 2.5,
+    "forbid_phrases": [
+      "구조를 그림으로 봅니다",
+      "열어 확인합니다",
+      "여기까지 소개였습니다"
+    ],
+    "camera_must_have_selector_except_goto_top": true,
+    "clicks_required_when_scout_has_interactive": true,
+    "min_successful_clicks": 4,
+    "optional_clicks_forbidden": true,
+    "show_cursor_highlight": true,
+    "show_caption_bar": true,
+    "show_progress_chip": true,
+    "expand_all_before_tour": true,
+    "page_ready_contract": true,
+    "lead_black_max_sec": 0.35,
+    "first_frame_min_size_bytes": 80000,
+    "mid_frame_min_size_bytes": 120000,
+    "quality_gate_must_pass": true,
+    "actions_log_required": true
+  },
+  "ship": {
+    "block_without_policy_pass": true,
+    "block_without_actions_log": true,
+    "block_without_quality_pass": true,
+    "block_without_scout_json": true
+  },
+  "notes": [
+    "MCP는 선택. 강제는 policy + schema + deterministic gate로 한다.",
+    "에이전트는 run_director.py --policy tutorial_v1 만 허용.",
+    "시나리오 hand-edit 시에도 enforce가 거부할 수 있다."
+  ]
+}

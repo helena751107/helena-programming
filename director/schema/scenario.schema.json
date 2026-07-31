@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helena.local/director/scenario.schema.json",
+  "title": "DirectorScenario",
+  "type": "object",
+  "required": ["id", "url", "title", "voice", "beats", "policy"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "url": { "type": "string", "format": "uri" },
+    "title": { "type": "string", "minLength": 1 },
+    "voice": { "type": "string" },
+    "policy": { "type": "string", "const": "tutorial_v1" },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "integer", "minimum": 360 },
+        "height": { "type": "integer", "minimum": 640 }
+      },
+      "required": ["width", "height"]
+    },
+    "beats": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "required": ["id", "narration", "camera", "clicks"],
+        "properties": {
+          "id": { "type": "string" },
+          "narration": { "type": "string", "minLength": 8, "maxLength": 78 },
+          "camera": {
+            "type": "object",
+            "required": ["action"],
+            "properties": {
+              "action": { "enum": ["goto_top", "scroll_to"] },
+              "selector": { "type": "string" }
+            }
+          },
+          "clicks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["selector", "optional"],
+              "properties": {
+                "selector": { "type": "string", "minLength": 1 },
+                "optional": { "type": "boolean" },
+                "why": { "type": "string" }
+              }
+            }
+          },
+          "caption": { "type": "string", "maxLength": 48 },
+          "hold_after_ms": { "type": "integer", "minimum": 200, "maximum": 2000 }
+        }
+      }
+    }
+  }
+}

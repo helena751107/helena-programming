@@ -22,6 +22,7 @@ import sys
 import time
 from pathlib import Path
 
+from enforce import EnforceError, enforce_all, load_policy, stamp_scenario
 from intro import make_intro_card
 from quality import gate_output, trim_leading_black
 from scout import (
@@ -159,12 +160,10 @@ def _wait_page_ready(page, url: str) -> None:
     page.wait_for_timeout(200)
 
 
-def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
+def shoot(scenario: dict, beats: list[dict], work: Path) -> tuple[Path, dict]:
     """
-    Two-phase shoot (pro):
-      1) Warm context — load & ready WITHOUT counting as final (still recorded
-         but we trim black in edit). Maximize first-paint before tour.
-      2) Tour with timed holds matching narration.
+    Tutorial shoot with forced overlays + actions_log.
+    Returns (raw_video_path, actions_log).
     """
     from playwright.sync_api import sync_playwright
 
@@ -176,7 +175,17 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
         shutil.rmtree(rec_dir)
     rec_dir.mkdir(parents=True)
 
-    timings = [b["audio_sec"] + b.get("pad_sec", 0.4) for b in beats]
+    timings = [b["audio_sec"] + b.get("pad_sec", 0.35) for b in beats]
+    overlay_js = (DIR / "overlays.js").read_text(encoding="utf-8")
+    actions: dict = {
+        "page_ready": False,
+        "cursor_highlight": True,
+        "caption_bar": True,
+        "progress_chip": True,
+        "successful_clicks": 0,
+        "failed_clicks": [],
+        "events": [],
+    }
     print(f"[shoot] open {url}", flush=True)
 
     with sync_playwright() as p:
@@ -196,22 +205,22 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
             record_video_size={"width": w, "height": h},
             color_scheme="dark",
             locale="ko-KR",
-            # reduce blank: start with dark
             reduced_motion="reduce",
         )
         page = context.new_page()
-        # seed dark blank
         page.set_content(
             "<!doctype html><html><body style='margin:0;background:#0a0908;width:100vw;height:100vh'></body></html>"
         )
-        page.wait_for_timeout(150)
+        page.wait_for_timeout(120)
 
         _wait_page_ready(page, url)
-        print("  page ready", flush=True)
+        actions["page_ready"] = True
+        page.add_script_tag(content=overlay_js)
+        page.evaluate("() => { if (window.__hd) window.__hd.setChip('TUTORIAL · LIVE'); }")
+        print("  page ready + overlays", flush=True)
 
-        # settle frame for first keyframe (anti-black head)
         page.evaluate("window.scrollTo(0,0)")
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(700)
 
         expand_sels = []
         if scenario.get("expand_all_selector"):
@@ -226,23 +235,24 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
                 loc = page.locator(sel).first
                 if loc.count() and loc.is_visible():
                     loc.click(timeout=2000)
-                    page.wait_for_timeout(700)
+                    page.wait_for_timeout(650)
                     print(f"  expand via {sel}", flush=True)
+                    actions["events"].append({"type": "expand", "selector": sel, "ok": True})
                     break
             except Exception:
                 pass
 
-        def smooth_scroll_to(selector: str, steps: int = 16):
+        def smooth_scroll_to(selector: str, steps: int = 18):
             try:
                 page.wait_for_selector(selector, timeout=8000)
             except Exception:
                 print(f"  ! missing selector {selector}", flush=True)
-                return
+                return False
             page.evaluate(
                 """([sel, steps]) => {
                   const el = document.querySelector(sel);
                   if (!el) return;
-                  const target = el.getBoundingClientRect().top + window.scrollY - 72;
+                  const target = el.getBoundingClientRect().top + window.scrollY - 80;
                   const start = window.scrollY;
                   const delta = target - start;
                   return new Promise(resolve => {
@@ -260,47 +270,85 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
                 }""",
                 [selector, steps],
             )
-            page.wait_for_timeout(400)
+            page.wait_for_timeout(380)
+            return True
 
-        def try_clicks(clicks: list):
+        def do_clicks(clicks: list) -> None:
             for c in clicks or []:
                 sel = c.get("selector")
-                optional = c.get("optional", True)
+                optional = bool(c.get("optional", False))
                 if not sel:
                     continue
                 ok = False
+                err = None
                 for part in [s.strip() for s in sel.split(",")]:
                     try:
                         loc = page.locator(part).first
                         if loc.count() == 0:
                             continue
-                        loc.scroll_into_view_if_needed(timeout=2000)
-                        # accordion: click head even if expanded toggle
-                        loc.click(timeout=2500, force=True)
-                        page.wait_for_timeout(500)
+                        loc.scroll_into_view_if_needed(timeout=2500)
+                        page.wait_for_timeout(200)
+                        # move tutorial cursor then pulse-click
+                        page.evaluate(
+                            """(part) => {
+                              const el = document.querySelector(part);
+                              if (window.__hd && el) return window.__hd.moveCursorTo(el);
+                            }""",
+                            part,
+                        )
+                        page.wait_for_timeout(100)
+                        page.evaluate("() => window.__hd && window.__hd.pulse()")
+                        loc.click(timeout=3000, force=True)
+                        page.wait_for_timeout(550)
                         ok = True
-                        print(f"  click {part}", flush=True)
+                        print(f"  click OK {part}", flush=True)
+                        actions["successful_clicks"] += 1
+                        actions["events"].append({"type": "click", "selector": part, "ok": True})
                         break
                     except Exception as e:
-                        if not optional:
-                            print(f"  click fail {part}: {e}", flush=True)
-                if not ok and not optional:
-                    print(f"  ! no click matched: {sel}", flush=True)
+                        err = str(e)
+                if not ok:
+                    print(f"  click FAIL {sel}: {err}", flush=True)
+                    actions["failed_clicks"].append(
+                        {"selector": sel, "optional": optional, "error": err}
+                    )
+                    actions["events"].append({"type": "click", "selector": sel, "ok": False})
+                    if not optional:
+                        # hard fail later via enforce; keep going to collect evidence
+                        pass
 
+        n = max(1, len(beats))
         for i, b in enumerate(beats):
             cam = b.get("camera") or {}
             action = cam.get("action", "scroll_to")
+            cap = b.get("caption") or b.get("id")
+            page.evaluate(
+                """([cap, p, chip]) => {
+                  if (!window.__hd) return;
+                  window.__hd.setCaption(cap);
+                  window.__hd.setProgress(p);
+                  window.__hd.setChip(chip);
+                }""",
+                [cap, (i + 1) / n, f"{i+1}/{n} · TUTORIAL"],
+            )
             print(f"[shoot] beat {b['id']} action={action} hold={timings[i]:.1f}s", flush=True)
             if action == "goto_top":
                 page.evaluate("window.scrollTo({top:0,behavior:'instant'})")
-                page.wait_for_timeout(500)
+                page.wait_for_timeout(450)
             elif action == "scroll_to" and cam.get("selector"):
                 smooth_scroll_to(cam["selector"])
-            try_clicks(b.get("clicks") or [])
-            # hold for narration — min 1.2s visual settle
-            page.wait_for_timeout(int(max(1.2, timings[i]) * 1000))
+            do_clicks(b.get("clicks") or [])
+            # hold for VO — keep caption visible
+            page.wait_for_timeout(int(max(1.4, timings[i]) * 1000))
 
-        page.wait_for_timeout(600)
+        page.evaluate(
+            """() => {
+              if (!window.__hd) return;
+              window.__hd.setCaption('Tutorial complete');
+              window.__hd.setProgress(1);
+            }"""
+        )
+        page.wait_for_timeout(700)
         context.close()
         browser.close()
 
@@ -309,7 +357,8 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
         raise RuntimeError("No Playwright video recorded")
     raw = videos[0]
     print(f"[shoot] raw video {raw} ({raw.stat().st_size} bytes)", flush=True)
-    return raw
+    print(f"[shoot] clicks ok={actions['successful_clicks']} fail={len(actions['failed_clicks'])}", flush=True)
+    return raw, actions
 
 
 def edit(raw_video: Path, narration: Path, intro: Path | None, out: Path, work: Path) -> Path:
@@ -460,8 +509,18 @@ def main():
         "--scout-only", action="store_true",
         help="Only run scout + write scenario from page; no render",
     )
-    ap.add_argument("--max-beats", type=int, default=7)
+    ap.add_argument("--max-beats", type=int, default=6)
+    ap.add_argument(
+        "--policy", default="tutorial_v1",
+        help="Forced policy id (default tutorial_v1). Blocks freeform LLM ship.",
+    )
+    ap.add_argument(
+        "--no-policy", action="store_true",
+        help="Dangerous: disable policy enforce (debug only)",
+    )
     args = ap.parse_args()
+
+    policy = None if args.no_policy else load_policy(args.policy)
 
     # resolve URL early
     url = args.url
@@ -482,31 +541,39 @@ def main():
     work.mkdir(parents=True)
 
     t0 = time.time()
-    print("=== Director Agent ===", flush=True)
+    print("=== Director Agent (policy={}) ===".format(args.policy if policy else "OFF"), flush=True)
 
     # ── 0) SCOUT ──────────────────────────────────────────
     scout = None
-    do_scout = args.scout or args.scout_only or (args.url and not args.scenario)
-    if do_scout:
-        print("\n[0/5] SCOUT — parse page structure", flush=True)
+    do_scout = True if policy else (args.scout or args.scout_only or (args.url and not args.scenario))
+    if args.scout_only or do_scout:
+        print("\n[0/6] SCOUT — parse page structure", flush=True)
         scout = scout_url(url, viewport={"width": 720, "height": 1280}, work=work)
         save_scout(scout, work / "scout.json")
 
     if args.scout_only:
         scenario = scenario_from_scout(scout, max_beats=args.max_beats, voice=VOICE_DEFAULT)
+        if policy:
+            scenario = stamp_scenario(scenario, policy["id"])
         (work / "scenario.json").write_text(
             json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        # also export under scenarios/
         export = DIR / "scenarios" / f"{scenario['id']}_from_scout.json"
         export.write_text(json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"[scout-only] scenario → {work / 'scenario.json'}", flush=True)
-        print(f"[scout-only] export  → {export}", flush=True)
+        if policy:
+            try:
+                enforce_all(scenario=scenario, policy=policy, scout=scout,
+                            actions_log=None, quality=None, stage="pre_shoot")
+                print("[enforce] scenario OK", flush=True)
+            except EnforceError as e:
+                print("[enforce] FAIL", e.errors, flush=True)
+                sys.exit(3)
         print(json.dumps({
             "sections": scout.get("section_count"),
             "interactives": scout.get("interactive_count"),
             "beats": len(scenario["beats"]),
             "title": scenario.get("title"),
+            "policy": scenario.get("policy"),
         }, ensure_ascii=False, indent=2))
         return
 
@@ -517,19 +584,41 @@ def main():
             print("[scout] merge selectors into hand scenario", flush=True)
             scenario = merge_scenario_with_scout(scenario, scout)
     else:
-        # URL-only path: scenario entirely from scout
         if not scout:
             scout = scout_url(url, work=work)
             save_scout(scout, work / "scout.json")
         scenario = scenario_from_scout(scout, max_beats=args.max_beats, voice=VOICE_DEFAULT)
 
+    if policy:
+        scenario = stamp_scenario(scenario, policy["id"])
+        try:
+            enforce_all(scenario=scenario, policy=policy, scout=scout,
+                        actions_log=None, quality=None, stage="pre_shoot")
+            print("[enforce] pre_shoot OK", flush=True)
+        except EnforceError as e:
+            print("[enforce] pre_shoot FAIL:", *e.errors, sep="\n  - ", flush=True)
+            (work / "enforce_errors.json").write_text(
+                json.dumps(e.errors, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            sys.exit(3)
+
     print(f"URL: {scenario['url']}", flush=True)
     (work / "scenario.json").write_text(
         json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    if policy:
+        (work / "policy.json").write_text(
+            json.dumps(policy, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
-    print("\n[1/5] WRITE+VOICE", flush=True)
+    print("\n[1/6] WRITE+VOICE", flush=True)
     beats = build_voices(scenario, work)
+    # enforce max narration duration
+    if policy:
+        max_sec = (policy.get("require") or {}).get("max_narration_sec", 99)
+        for b in beats:
+            if b.get("audio_sec", 0) > max_sec:
+                print(f"  ! trim hold — beat {b['id']} audio {b['audio_sec']:.1f}s > {max_sec}", flush=True)
     narration = concat_audio(beats, work)
     print(f"narration total {ffprobe_duration(narration):.1f}s", flush=True)
 
@@ -541,35 +630,75 @@ def main():
             work,
             scenario.get("title") or "Helena",
             scenario.get("logline") or (scenario.get("url") or "")[:80],
-            seconds=2.2,
-            kicker="Director · Scout → Shoot",
+            seconds=2.0,
+            kicker="TUTORIAL · FORCED POLICY",
         )
         intro_png = work / "intro.png"
 
-    print("\n[2/5] SHOOT", flush=True)
-    raw = shoot(scenario, beats, work)
+    print("\n[2/6] SHOOT", flush=True)
+    raw, actions_log = shoot(scenario, beats, work)
+    (work / "actions_log.json").write_text(
+        json.dumps(actions_log, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    if policy:
+        try:
+            enforce_all(scenario=scenario, policy=policy, scout=scout,
+                        actions_log=actions_log, quality=None, stage="post_shoot")
+            print("[enforce] post_shoot OK", flush=True)
+        except EnforceError as e:
+            print("[enforce] post_shoot FAIL:", *e.errors, sep="\n  - ", flush=True)
+            sys.exit(4)
 
-    print("\n[3/5] EDIT", flush=True)
+    print("\n[3/6] EDIT", flush=True)
     out = edit(raw, narration, intro, args.out, work)
 
-    print("\n[4/5] QUALITY GATE", flush=True)
+    print("\n[4/6] QUALITY GATE", flush=True)
     gate = gate_output(out, work=work / "gate", intro_png=intro_png)
-    if not gate.get("pass"):
-        print("QUALITY GATE FAILED — refuse to treat as shippable", flush=True)
-        # still write report for debug
-        write_report(scenario, beats, out, work)
-        shutil.copy(work / "scenario.json", out.with_suffix(".scenario.json"))
+    if policy:
+        try:
+            enforce_all(scenario=scenario, policy=policy, scout=scout,
+                        actions_log=actions_log, quality=gate, stage="pre_ship")
+            print("[enforce] pre_ship OK", flush=True)
+        except EnforceError as e:
+            print("[enforce] pre_ship FAIL:", *e.errors, sep="\n  - ", flush=True)
+            write_report(scenario, beats, out, work)
+            sys.exit(2)
+    elif not gate.get("pass"):
+        print("QUALITY GATE FAILED", flush=True)
         sys.exit(2)
 
-    print("\n[5/5] REPORT", flush=True)
+    print("\n[5/6] SELF-AUDIT", flush=True)
+    audit = {
+        "url": scenario.get("url"),
+        "policy": scenario.get("policy"),
+        "beats": len(beats),
+        "successful_clicks": actions_log.get("successful_clicks"),
+        "failed_clicks": actions_log.get("failed_clicks"),
+        "duration_sec": ffprobe_duration(out),
+        "quality_pass": gate.get("pass"),
+        "shortcomings_self": [],
+    }
+    # deterministic self-critique hooks
+    if actions_log.get("successful_clicks", 0) < 4:
+        audit["shortcomings_self"].append("clicks < 4")
+    if any(len(b.get("narration", "")) > 78 for b in scenario.get("beats") or []):
+        audit["shortcomings_self"].append("narration over char cap")
+    (work / "self_audit.json").write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(json.dumps(audit, ensure_ascii=False, indent=2), flush=True)
+
+    print("\n[6/6] REPORT", flush=True)
     report = write_report(scenario, beats, out, work)
     shutil.copy(work / "scenario.json", out.with_suffix(".scenario.json"))
     shutil.copy(report, out.with_suffix(".report.md"))
     if (work / "gate" / "quality_report.json").exists():
         shutil.copy(work / "gate" / "quality_report.json", out.with_suffix(".quality.json"))
+    shutil.copy(work / "actions_log.json", out.with_suffix(".actions.json"))
+    shutil.copy(work / "self_audit.json", out.with_suffix(".audit.json"))
 
     elapsed = time.time() - t0
-    print("\n=== DONE (SHIP) ===", flush=True)
+    print("\n=== DONE (SHIP · POLICY PASS) ===", flush=True)
     print(f"out: {out}", flush=True)
     print(f"dur: {ffprobe_duration(out):.1f}s  size: {out.stat().st_size // 1024}KB  time: {elapsed:.0f}s", flush=True)
     print(f"report: {report}", flush=True)

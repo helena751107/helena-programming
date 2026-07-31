@@ -225,34 +225,36 @@ def scout_url(url: str, viewport: dict | None = None, work: Path | None = None) 
 
 
 def _narrate_section(sec: dict, is_first: bool, is_last: bool, site_title: str) -> str:
-    """Rule-based writer — short beats (≤ ~11s spoken). Quality: no monologue."""
+    """Tutorial VO — short, specific, no filler template phrases."""
     h = (sec.get("heading") or sec.get("id") or "이 구간").strip()
-    h = re.sub(r"\s+", " ", h)[:40]
+    h = re.sub(r"\s+", " ", h)[:36]
     deck = (sec.get("deck") or "").strip()
     preview = (sec.get("text_preview") or "").strip()
     support = re.sub(r"\s+", " ", deck or preview)
     if support.startswith(h):
         support = support[len(h):].strip(" ·—-")
-    support = support[:72]
+    support = support[:54]
     bits = []
     if is_first:
-        bits.append(f"{site_title or '이 사이트'}.")
-    bits.append(h if h.endswith(("다", "요", ".")) else f"{h}.")
+        bits.append(f"{site_title or '이 제품'} 투어를 시작합니다.")
+    # prefer concrete heading as beat title spoken once
+    title = h if h.endswith(("다", "요", ".")) else f"{h}."
+    bits.append(title)
     if support:
         if not re.search(r"[.다요]$", support):
             support = support.rstrip("., ") + "."
         bits.append(support)
-    if sec.get("has_diagram") and len(" ".join(bits)) < 70:
-        bits.append("구조를 그림으로 봅니다.")
-    if sec.get("has_accordion") and len(" ".join(bits)) < 85:
-        bits.append("열어 확인합니다.")
+    if sec.get("has_diagram"):
+        bits.append("핵심 노드를 짚어 봅니다.")
+    elif sec.get("has_accordion"):
+        bits.append("이 섹션을 펼칩니다.")
     if is_last:
-        bits.append("여기까지 소개였습니다.")
+        bits.append("투어를 마칩니다.")
     text = re.sub(r"\s+", " ", " ".join(bits)).strip()
     text = re.sub(r"\.\.+", ".", text)
-    # hard cap ~90 Korean chars ≈ 10–12s
-    if len(text) > 95:
-        text = text[:93].rstrip() + "."
+    # policy max 78
+    if len(text) > 78:
+        text = text[:76].rstrip(" .,") + "."
     return text
 
 
@@ -336,6 +338,21 @@ def scenario_from_scout(
             "hold_after_ms": 600,
         }]
 
+    # ensure each beat has required click when interactives exist
+    for b, sec in zip(beats, sections):
+        if not b.get("clicks") and (sec.get("interactives") or []):
+            it = sec["interactives"][0]
+            b["clicks"] = [{
+                "selector": it["selector"],
+                "optional": False,
+                "why": f"force {it.get('kind')}",
+            }]
+        else:
+            for c in b.get("clicks") or []:
+                c["optional"] = False
+        b["caption"] = re.sub(r"\s+", " ", (sec.get("heading") or b["id"]))[:48]
+        b["hold_after_ms"] = 450
+
     scenario = {
         "id": re.sub(r"[^a-zA-Z0-9_-]+", "_", (scout.get("url") or "site").rstrip("/").split("/")[-1]) or "site",
         "url": scout.get("url"),
@@ -344,6 +361,7 @@ def scenario_from_scout(
         "tone": tone,
         "lang": scout.get("lang") or "ko",
         "voice": voice,
+        "policy": "tutorial_v1",
         "duration_target_sec": min(90, 8 * len(beats) + 10),
         "viewport": {
             "width": (scout.get("viewport") or {}).get("w") or 720,
