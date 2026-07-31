@@ -21,5 +21,28 @@
     "target_sdk": 34,
     "java_version": "17",
     "domains": ["on-device", "web-mcp"]
+  },
+  {
+    "id": "clip-shorts",
+    "name": "Clip Shorts — Helena Edition",
+    "package": "com.helena.clipshorts",
+    "directory": "apps/clip-shorts",
+    "version": "7.0.0",
+    "version_code": 1,
+    "status": "forked",
+    "download_active": false,
+    "category": "creative",
+    "overlay": false,
+    "description": "FFmpeg.wasm PWA — 클립 이어붙이기·이미지+오디오→영상 변환·3분 쇼츠 생성",
+    "icon_emoji": "🎬",
+    "source_origin": "dtslib1979/dtslib-cloud-appstore/clip-shorts",
+    "domains": ["web-mcp", "on-device"],
+    "tech": "FFmpeg.wasm 0.11.0 + core-st",
+    "planned_features": [
+      "이미지+오디오 → 영상 클립 변환",
+      "TTS 더빙 트랙 주입",
+      "parksy-audio RVC 프리셋",
+      "MCP export_video 파이프"
+    ]
   }
 ]

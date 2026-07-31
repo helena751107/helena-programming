@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Auto-generate 3-minute Shorts by selecting clips">
+    <meta name="theme-color" content="#e91e63">
+    <title>Clip Shorts - Clip Combo Shorts Maker</title>
+    <link rel="stylesheet" href="./style.css?v=5.2">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Clip Shorts</h1>
+            <p class="subtitle">Select clips → Auto-generate 3-minute Shorts</p>
+            <p class="version" id="appVersion">v--</p>
+        </header>
+
+        <div class="memory-warning" id="memWarn" style="display: none;"></div>
+
+        <main>
+            <!-- Step 1: Clip Duration -->
+            <section class="step-card">
+                <div class="step-header">
+                    <span class="step-num">1</span>
+                    <span class="step-title">Select Clip Duration</span>
+                </div>
+                <div class="duration-buttons">
+                    <button id="btn10s" class="duration-btn active" onclick="setClipDuration(10)">
+                        <span class="dur-value">10 sec</span>
+                        <span class="dur-info">Max 30 clips</span>
+                    </button>
+                    <button id="btn15s" class="duration-btn" onclick="setClipDuration(15)">
+                        <span class="dur-value">15 sec</span>
+                        <span class="dur-info">Max 20 clips</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Step 2: Upload Clips -->
+            <section class="step-card">
+                <div class="step-header">
+                    <span class="step-num">2</span>
+                    <span class="step-title">Upload Clips</span>
+                </div>
+                <div class="file-drop-zone" id="clipDropZone"
+                     onclick="document.getElementById('clipInput').click()"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event)">
+                    <input type="file" id="clipInput" accept="video/*" multiple hidden>
+                    <div class="drop-content">
+                        <span class="drop-icon">📹</span>
+                        <span class="drop-text">Click or drag to add clips</span>
+                        <span class="drop-hint">Multiple files supported (MP4, MOV)</span>
+                    </div>
+                </div>
+
+                <div id="clipList" class="clip-list"></div>
+
+                <div id="clipSummary" class="clip-summary" style="display: none;">
+                    <span id="clipCount">0</span> clips ·
+                    <span id="totalDuration">0 min 0 sec</span>
+                </div>
+            </section>
+
+            <!-- Step 3: Effects -->
+            <section class="step-card">
+                <div class="step-header">
+                    <span class="step-num">3</span>
+                    <span class="step-title">Effect Settings</span>
+                </div>
+
+                <!-- Intro Effect -->
+                <div class="effect-section">
+                    <p class="effect-label">🎬 Intro Effect (Fade In)</p>
+                    <div class="effect-buttons" id="introEffects">
+                        <button class="effect-btn active" onclick="setIntro('none')" data-effect="none">
+                            <span class="effect-icon">⊘</span>
+                            <span class="effect-name">None</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('tv')" data-effect="tv">
+                            <span class="effect-icon">📺</span>
+                            <span class="effect-name">TV</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('vhs')" data-effect="vhs">
+                            <span class="effect-icon">📼</span>
+                            <span class="effect-name">VHS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('focus')" data-effect="focus">
+                            <span class="effect-icon">🎯</span>
+                            <span class="effect-name">FOCUS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('tremble')" data-effect="tremble">
+                            <span class="effect-icon">📳</span>
+                            <span class="effect-name">TREMBLE</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('zoom')" data-effect="zoom">
+                            <span class="effect-icon">🔍</span>
+                            <span class="effect-name">ZOOM</span>
+                        </button>
+                        <button class="effect-btn" onclick="setIntro('film')" data-effect="film">
+                            <span class="effect-icon">🎞️</span>
+                            <span class="effect-name">FILM</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Middle Transition -->
+                <div class="effect-section">
+                    <p class="effect-label">🔗 Middle Transition (Between Clips)</p>
+                    <div class="effect-buttons" id="transitionEffects">
+                        <button class="effect-btn active" onclick="setTransition('none')" data-effect="none">
+                            <span class="effect-icon">⊘</span>
+                            <span class="effect-name">None</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('tv')" data-effect="tv">
+                            <span class="effect-icon">📺</span>
+                            <span class="effect-name">TV</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('vhs')" data-effect="vhs">
+                            <span class="effect-icon">📼</span>
+                            <span class="effect-name">VHS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('focus')" data-effect="focus">
+                            <span class="effect-icon">🎯</span>
+                            <span class="effect-name">FOCUS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('tremble')" data-effect="tremble">
+                            <span class="effect-icon">📳</span>
+                            <span class="effect-name">TREMBLE</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('zoom')" data-effect="zoom">
+                            <span class="effect-icon">🔍</span>
+                            <span class="effect-name">ZOOM</span>
+                        </button>
+                        <button class="effect-btn" onclick="setTransition('film')" data-effect="film">
+                            <span class="effect-icon">🎞️</span>
+                            <span class="effect-name">FILM</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ending Effect -->
+                <div class="effect-section">
+                    <p class="effect-label">🎬 Ending Effect (Fade Out)</p>
+                    <div class="effect-buttons" id="endingEffects">
+                        <button class="effect-btn active" onclick="setEnding('none')" data-effect="none">
+                            <span class="effect-icon">⊘</span>
+                            <span class="effect-name">None</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('tv')" data-effect="tv">
+                            <span class="effect-icon">📺</span>
+                            <span class="effect-name">TV</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('vhs')" data-effect="vhs">
+                            <span class="effect-icon">📼</span>
+                            <span class="effect-name">VHS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('focus')" data-effect="focus">
+                            <span class="effect-icon">🎯</span>
+                            <span class="effect-name">FOCUS</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('tremble')" data-effect="tremble">
+                            <span class="effect-icon">📳</span>
+                            <span class="effect-name">TREMBLE</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('zoom')" data-effect="zoom">
+                            <span class="effect-icon">🔍</span>
+                            <span class="effect-name">ZOOM</span>
+                        </button>
+                        <button class="effect-btn" onclick="setEnding('film')" data-effect="film">
+                            <span class="effect-icon">🎞️</span>
+                            <span class="effect-name">FILM</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Volume Normalization -->
+            <section class="step-card">
+                <div class="step-header">
+                    <span class="step-num">4</span>
+                    <span class="step-title">Volume Normalization</span>
+                </div>
+                <p class="step-desc">Equalize audio levels across all clips</p>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="normalizeToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Loudness normalization (-16 LUFS)</span>
+                </div>
+            </section>
+
+            <!-- Step 5: Background Music -->
+            <section class="step-card">
+                <div class="step-header">
+                    <span class="step-num">5</span>
+                    <span class="step-title">Background Music</span>
+                </div>
+                <p class="step-desc">Add background music and adjust the volume</p>
+
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="bgmToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Use Background Music</span>
+                </div>
+
+                <div id="bgmControls" class="bgm-controls" style="display: none;">
+                    <!-- BGM Upload -->
+                    <div class="bgm-upload-section">
+                        <div class="file-drop-zone bgm-drop" id="bgmDropZone"
+                             onclick="document.getElementById('bgmInput').click()"
+                             ondragover="handleBGMDragOver(event)"
+                             ondragleave="handleDragLeave(event)"
+                             ondrop="handleBGMDrop(event)">
+                            <input type="file" id="bgmInput" accept="audio/*" hidden>
+                            <div class="drop-content">
+                                <span class="drop-icon">🎵</span>
+                                <span class="drop-text">Select music file</span>
+                                <span class="drop-hint">MP3, WAV, M4A, etc.</span>
+                            </div>
+                        </div>
+
+                        <!-- BGM Info -->
+                        <div id="bgmInfo" class="bgm-info" style="display: none;">
+                            <div class="bgm-file-info">
+                                <span class="bgm-icon">🎵</span>
+                                <span id="bgmFileName" class="bgm-name">filename.mp3</span>
+                            </div>
+                            <div class="bgm-actions">
+                                <button id="bgmPlayBtn" class="bgm-play-btn">▶️</button>
+                                <button id="bgmRemoveBtn" class="bgm-remove-btn">✕</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden audio for preview -->
+                    <audio id="bgmPreview" preload="metadata"></audio>
+
+                    <!-- Volume Controls -->
+                    <div class="volume-controls">
+                        <div class="volume-row">
+                            <span class="volume-label">🎵 BGM Volume</span>
+                            <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.5" class="volume-slider">
+                            <span id="bgmVolumeValue" class="volume-value">50%</span>
+                        </div>
+                        <div class="volume-row">
+                            <span class="volume-label">🎬 Original Volume</span>
+                            <input type="range" id="clipVolume" min="0" max="1" step="0.05" value="1" class="volume-slider">
+                            <span id="clipVolumeValue" class="volume-value">100%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 6: Generate -->
+            <section class="step-card generate-card">
+                <div class="step-header">
+                    <span class="step-num">6</span>
+                    <span class="step-title">Generate Shorts</span>
+                </div>
+
+                <button id="genBtn" class="generate-btn" onclick="generate()" disabled>
+                    <span class="btn-icon">🚀</span>
+                    <span class="btn-text">Create 3-Minute Shorts</span>
+                </button>
+            </section>
+
+            <!-- Progress -->
+            <section id="progressSection" class="progress-section" style="display: none;">
+                <div class="progress-header">
+                    <span id="statusText" class="status">Preparing...</span>
+                    <button onclick="abortProcessing()" class="abort-btn">⏹️ Abort</button>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-details">
+                        <span id="progressText">0%</span>
+                        <span id="etaText" class="eta"></span>
+                    </div>
+                </div>
+                <div id="progressLog" class="progress-log"></div>
+            </section>
+
+            <!-- Result -->
+            <section id="resultSection" class="result-section" style="display: none;">
+                <div class="result-header">
+                    <span class="result-icon">✅</span>
+                    <span class="result-title">Done!</span>
+                </div>
+                <div id="resultStats" class="result-stats"></div>
+                <video id="preview" controls playsinline class="preview-video"></video>
+                <div class="result-actions">
+                    <a id="downloadLink" class="action-btn download-btn" download>
+                        💾 Download
+                    </a>
+                    <button onclick="reset()" class="action-btn reset-btn">
+                        🔄 Start Over
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>DTSLIB Tools</p>
+        </footer>
+    </div>
+
+    <script src="./app.js?v=7.0"></script>
+    <script src="../shared/js/nav.js"></script>
+    <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
