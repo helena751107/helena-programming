@@ -113,7 +113,7 @@ textarea { resize:vertical; min-height:60px; }
     </div>
   </div>
   <div class="card standalone">
-    <h3>🎬 생성</h3>
+    <h3>🎬 생성 <span style="font-weight:400;font-size:.7rem;color:var(--muted)">(최대 8섹션·400자/섹션)</span></h3>
     <button class="btn btn-primary" id="genBtn" onclick="generateOne()">영상 생성</button>
   </div>
 </div>
@@ -121,10 +121,10 @@ textarea { resize:vertical; min-height:60px; }
 <!-- ════════════════════════════════════════════════════  TAB: STITCH  ═══ -->
 <div id="tab-stitch" class="hidden">
   <div class="card">
-    <h3>➕ 클립 추가 (URL 여러 개)</h3>
+    <h3>➕ 클립 추가 (URL 여러 개 · 최대 <span id="maxClips">5</span>개)</h3>
     <div class="add-row">
       <input type="url" id="stitchUrl" placeholder="https://... 새 클립 URL">
-      <button class="btn btn-sm btn-outline" onclick="addClip()">+ 추가</button>
+      <button class="btn btn-sm btn-outline" id="addClipBtn" onclick="addClip()">+ 추가</button>
     </div>
     <div class="clip-list" id="clipList">
       <div style="color:var(--muted);font-size:.8rem;text-align:center;padding:.5rem;">
@@ -163,12 +163,20 @@ textarea { resize:vertical; min-height:60px; }
 <div class="log" id="log"></div>
 
 <script>
+// ── LIMITS ──
+const LIMIT = {
+  maxSections: 8,      // 영상당 최대 섹션
+  maxClips: 5,         // 이어붙이기 최대 클립 수
+  maxBodyChars: 400,   // 섹션당 최대 글자
+  maxSectionChars: 3000 // 한 섹션 TTS 최대 글자
+};
+
 // ── STATE ──
 const S = {
   mode: 'generate',
   voices: [],
   voiceIdx: 0,
-  clips: [],        // {url, title, status:'wait'|'done', blob, url_blob}
+  clips: [],
   resultBlob: null,
   resultUrl: null
 };
@@ -260,9 +268,10 @@ function wrap(ctx, text, maxW) {
 }
 
 function speakText(text, voice) {
+  const truncated = text.length > LIMIT.maxSectionChars ? text.substring(0,LIMIT.maxSectionChars)+'...' : text;
   return new Promise(resolve => {
-    if (!window.speechSynthesis) { setTimeout(resolve, text.length*60); return; }
-    const u = new SpeechSynthesisUtterance(text);
+    if (!window.speechSynthesis) { setTimeout(resolve, truncated.length*60); return; }
+    const u = new SpeechSynthesisUtterance(truncated);
     u.voice = voice; u.rate = 0.95; u.pitch = 1; u.volume = 1;
     u.onend = () => resolve();
     u.onerror = () => resolve();
@@ -284,16 +293,16 @@ function splitSections(text) {
   if (hSplit.length>1) {
     for (let i=1; i<hSplit.length; i+=2) {
       const body = (hSplit[i+1]||'').trim();
-      if (body.length>5) secs.push({title:hSplit[i].trim(), body:body.substring(0,400)});
+      if (body.length>5) secs.push({title:hSplit[i].trim(), body:body.substring(0,LIMIT.maxBodyChars)});
     }
   }
   if (!secs.length) {
     const sents = clean.split(/[.。!?！？\n]+/).filter(s=>s.trim().length>5);
     for (let i=0; i<Math.min(sents.length,15); i+=3) {
-      secs.push({title:`Part ${Math.floor(i/3)+1}`, body:sents.slice(i,i+3).join('. ').substring(0,400)});
+      secs.push({title:`Part ${Math.floor(i/3)+1}`, body:sents.slice(i,i+3).join('. ').substring(0,LIMIT.maxBodyChars)});
     }
   }
-  return secs.slice(0,10);
+  return secs.slice(0, LIMIT.maxSections);
 }
 
 // ── GENERATE ONE ──
@@ -353,6 +362,7 @@ async function generateOne() {
 
 // ── STITCH: CLIP MANAGEMENT ──
 function addClip() {
+  if (S.clips.length >= LIMIT.maxClips) { log(`⚠️ 최대 ${LIMIT.maxClips}개 클립`, 'err'); return; }
   const input = document.getElementById('stitchUrl');
   const url = input.value.trim();
   if (!url) return;
@@ -371,6 +381,10 @@ function moveClip(i, dir) {
 
 function renderClips() {
   const list = document.getElementById('clipList');
+  const addBtn = document.getElementById('addClipBtn');
+  const maxEl = document.getElementById('maxClips');
+  if (maxEl) maxEl.textContent = LIMIT.maxClips;
+
   if (!S.clips.length) {
     list.innerHTML = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:.5rem;">URL을 추가하세요</div>';
   } else {
@@ -385,6 +399,16 @@ function renderClips() {
           <button onclick="removeClip(${i})" style="color:#f87171">✕</button>
         </div>
       </div>`).join('');
+  }
+
+  if (S.clips.length >= LIMIT.maxClips) {
+    addBtn.disabled = true;
+    addBtn.textContent = '최대 '+LIMIT.maxClips+'개';
+    document.getElementById('stitchUrl').disabled = true;
+  } else {
+    addBtn.disabled = false;
+    addBtn.textContent = '+ 추가';
+    document.getElementById('stitchUrl').disabled = false;
   }
   updateStitchBtn();
 }
