@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Director Agent — URL → scripted tour video (Writer + Director + Camera + Voice + Edit)
+Director Agent — URL → scripted tour video
+  Scout → Writer/Director → Voice → Shoot → Edit
 
 Usage:
-  python3 run_director.py --scenario scenarios/helena_phone.json
-  python3 run_director.py --url https://example.com --out out/demo.mp4
+  python3 run_director.py --url https://helena751107.github.io/helena_phone/
+  python3 run_director.py --scenario scenarios/helena_phone.json --scout
+  python3 run_director.py --url URL --scout-only   # write scout.json + scenario only
 
 Phone/proot friendly: Playwright record + edge-tts + ffmpeg.
 """
@@ -19,6 +21,13 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+from scout import (
+    merge_scenario_with_scout,
+    save_scout,
+    scenario_from_scout,
+    scout_url,
+)
 
 DIR = Path(__file__).resolve().parent
 DEFAULT_OUT = DIR / "out" / "director_out.mp4"
@@ -73,27 +82,33 @@ def build_voices(scenario: dict, work: Path) -> list[dict]:
 
 
 def concat_audio(beats: list[dict], work: Path) -> Path:
-    """Concat per-beat mp3 with short silence pads using ffmpeg."""
-    voice_dir = work / "voice"
-    list_file = work / "audio_concat.txt"
+    """Concat per-beat mp3 with short silence pads (re-encode to avoid DTS glitches)."""
     silence = work / "silence_200ms.mp3"
-    # 0.2s silence generator
     run([
         "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
         "-t", "0.2", "-q:a", "9", "-acodec", "libmp3lame", str(silence),
     ])
-    lines = []
-    for i, b in enumerate(beats):
-        lines.append(f"file '{Path(b['voice_path']).resolve()}'")
-        # pad silence proportional to hold (min 1 chunk)
+    # build filter_complex amix/concat of decoded streams
+    inputs: list[str] = []
+    filter_parts: list[str] = []
+    idx = 0
+    for b in beats:
+        inputs += ["-i", str(Path(b["voice_path"]).resolve())]
+        filter_parts.append(f"[{idx}:a]")
+        idx += 1
         n = max(1, int(round(b.get("pad_sec", 0.4) / 0.2)))
         for _ in range(n):
-            lines.append(f"file '{silence.resolve()}'")
-    list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            inputs += ["-i", str(silence.resolve())]
+            filter_parts.append(f"[{idx}:a]")
+            idx += 1
+    n_in = idx
+    filt = "".join(filter_parts) + f"concat=n={n_in}:v=0:a=1[aout]"
     out = work / "narration.mp3"
     run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
-        "-c", "copy", str(out),
+        "ffmpeg", "-y", *inputs,
+        "-filter_complex", filt, "-map", "[aout]",
+        "-c:a", "libmp3lame", "-q:a", "4",
+        str(out),
     ])
     return out
 
@@ -176,13 +191,22 @@ def shoot(scenario: dict, beats: list[dict], work: Path) -> Path:
           body{cursor:auto!important}
           html{scroll-behavior:auto!important}
         """)
-        # expand all chapters if toolbar exists
-        for sel in ("#accExpand", "button:has-text('Expand')", "button:has-text('펼치')"):
+        # expand all — prefer scout-discovered selector
+        expand_sels = []
+        if scenario.get("expand_all_selector"):
+            expand_sels.append(scenario["expand_all_selector"])
+        expand_sels += [
+            "#accExpand", "#accOpenAll",
+            "button:has-text('Expand')", "button:has-text('펼치')",
+            "button:has-text('모두 펼치')",
+        ]
+        for sel in expand_sels:
             try:
                 loc = page.locator(sel).first
                 if loc.count() and loc.is_visible():
                     loc.click(timeout=2000)
-                    page.wait_for_timeout(600)
+                    page.wait_for_timeout(700)
+                    print(f"  expand via {sel}", flush=True)
                     break
             except Exception:
                 pass
@@ -397,23 +421,83 @@ def main():
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--work", type=Path, default=None)
     ap.add_argument("--skip-intro", action="store_true")
+    ap.add_argument(
+        "--scout", action="store_true",
+        help="Scout page first; merge selectors into scenario (or auto-write if no scenario)",
+    )
+    ap.add_argument(
+        "--scout-only", action="store_true",
+        help="Only run scout + write scenario from page; no render",
+    )
+    ap.add_argument("--max-beats", type=int, default=7)
     args = ap.parse_args()
 
-    scenario = load_scenario(args.scenario, args.url)
-    work = args.work or (DIR / "out" / f"work_{scenario.get('id', 'run')}")
+    # resolve URL early
+    url = args.url
+    if not url and args.scenario and args.scenario.exists():
+        url = json.loads(args.scenario.read_text(encoding="utf-8")).get("url")
+    if not url and not args.scenario:
+        raise SystemExit("Need --url or --scenario")
+
+    sid = "run"
+    if args.scenario:
+        sid = args.scenario.stem
+    elif url:
+        sid = url.rstrip("/").split("/")[-1] or "run"
+
+    work = args.work or (DIR / "out" / f"work_{sid}")
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
-    # save scenario snapshot
+
+    t0 = time.time()
+    print("=== Director Agent ===", flush=True)
+
+    # ── 0) SCOUT ──────────────────────────────────────────
+    scout = None
+    do_scout = args.scout or args.scout_only or (args.url and not args.scenario)
+    if do_scout:
+        print("\n[0/5] SCOUT — parse page structure", flush=True)
+        scout = scout_url(url, viewport={"width": 720, "height": 1280}, work=work)
+        save_scout(scout, work / "scout.json")
+
+    if args.scout_only:
+        scenario = scenario_from_scout(scout, max_beats=args.max_beats, voice=VOICE_DEFAULT)
+        (work / "scenario.json").write_text(
+            json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        # also export under scenarios/
+        export = DIR / "scenarios" / f"{scenario['id']}_from_scout.json"
+        export.write_text(json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[scout-only] scenario → {work / 'scenario.json'}", flush=True)
+        print(f"[scout-only] export  → {export}", flush=True)
+        print(json.dumps({
+            "sections": scout.get("section_count"),
+            "interactives": scout.get("interactive_count"),
+            "beats": len(scenario["beats"]),
+            "title": scenario.get("title"),
+        }, ensure_ascii=False, indent=2))
+        return
+
+    # load or build scenario
+    if args.scenario:
+        scenario = load_scenario(args.scenario, args.url or url)
+        if scout:
+            print("[scout] merge selectors into hand scenario", flush=True)
+            scenario = merge_scenario_with_scout(scenario, scout)
+    else:
+        # URL-only path: scenario entirely from scout
+        if not scout:
+            scout = scout_url(url, work=work)
+            save_scout(scout, work / "scout.json")
+        scenario = scenario_from_scout(scout, max_beats=args.max_beats, voice=VOICE_DEFAULT)
+
+    print(f"URL: {scenario['url']}", flush=True)
     (work / "scenario.json").write_text(
         json.dumps(scenario, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    t0 = time.time()
-    print("=== Director Agent ===", flush=True)
-    print(f"URL: {scenario['url']}", flush=True)
-
-    print("\n[1/4] WRITE+VOICE", flush=True)
+    print("\n[1/5] WRITE+VOICE", flush=True)
     beats = build_voices(scenario, work)
     narration = concat_audio(beats, work)
     print(f"narration total {ffprobe_duration(narration):.1f}s", flush=True)
@@ -428,13 +512,13 @@ def main():
             2.4,
         )
 
-    print("\n[2/4] SHOOT", flush=True)
+    print("\n[2/5] SHOOT", flush=True)
     raw = shoot(scenario, beats, work)
 
-    print("\n[3/4] EDIT", flush=True)
+    print("\n[3/5] EDIT", flush=True)
     out = edit(raw, narration, intro, args.out, work)
 
-    print("\n[4/4] REPORT", flush=True)
+    print("\n[4/5] REPORT", flush=True)
     report = write_report(scenario, beats, out, work)
     # copy scenario next to out
     shutil.copy(work / "scenario.json", out.with_suffix(".scenario.json"))

@@ -1,0 +1,185 @@
+{
+  "id": "helena_phone",
+  "url": "https://helena751107.github.io/helena_phone/",
+  "title": "S21 PHONE — Webzine Vol.01",
+  "logline": "S21 Phone Webzine — 갤럭시 한 대로 돌봄과 소망을 돌리는 AI 워크스테이션. Vol.1 Editorial.",
+  "tone": "editorial tutorial",
+  "lang": "ko",
+  "voice": "ko-KR-SunHiNeural",
+  "duration_target_sec": 66,
+  "viewport": {
+    "width": 720,
+    "height": 1280
+  },
+  "expand_all_selector": "#accExpand",
+  "beats": [
+    {
+      "id": "b0_cover",
+      "narration": "S21 PHONE를 소개합니다. ONE PHONE. Two tracks. Full stack. 돌봄은 깨지지 않게. 소망은 세상에 닿게. 대필작가-간병인이 갤럭시 한 대로 굴리는 AI 워크스테이션 — 웹진 에디션.",
+      "camera": {
+        "action": "goto_top"
+      },
+      "clicks": [
+        {
+          "selector": "#cover > div.cover-inner:nth-of-type(3) > div.cover-cta:nth-of-type(2) > a.btn.btn-solid:nth-of-type(1)",
+          "optional": true,
+          "why": "demo cta"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "cover",
+        "heading": "ONE PHONE. Two tracks. Full stack.",
+        "has_diagram": false,
+        "interactive_n": 3
+      }
+    },
+    {
+      "id": "b1_tracks",
+      "narration": "돌봄과 소망을 동시에. 하나의 폰, 두 개의 목적. 트랙 1은 절대 안 깨지는 안전망. 트랙 2는 목소리를 세상에 세우는 스튜디오. 접힌 섹션을 열어 내용을 확인합니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#tracks"
+      },
+      "clicks": [
+        {
+          "selector": "#tracks-head",
+          "optional": true,
+          "why": "open accordion"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "tracks",
+        "heading": "돌봄과 소망을 동시에",
+        "has_diagram": false,
+        "interactive_n": 1
+      }
+    },
+    {
+      "id": "b2_system",
+      "narration": "인포그래픽 · 아키텍처. 노드에 마우스를 올리면 역할이 펼쳐집니다. 데이터가 폰에서 세상으로 흐르는 길. 다이어그램과 인포그래픽으로 구조를 보여 줍니다. 접힌 섹션을 열어 내용을 확인합니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#system"
+      },
+      "clicks": [
+        {
+          "selector": "#system-head",
+          "optional": true,
+          "why": "open accordion"
+        },
+        {
+          "selector": "#archBox > svg.svg-arch > g.node:nth-of-type(1)",
+          "optional": true,
+          "why": "demo diagram"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "system",
+        "heading": "인포그래픽 · 아키텍처",
+        "has_diagram": true,
+        "interactive_n": 10
+      }
+    },
+    {
+      "id": "b3_agents",
+      "narration": "역할이 다른 세 동료. 카드를 클릭하면 레이더 차트와 강점이 바뀝니다. 만능 하나보다 분업. 다이어그램과 인포그래픽으로 구조를 보여 줍니다. 접힌 섹션을 열어 내용을 확인합니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#agents"
+      },
+      "clicks": [
+        {
+          "selector": "#agents-head",
+          "optional": true,
+          "why": "open accordion"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "agents",
+        "heading": "역할이 다른 세 동료",
+        "has_diagram": true,
+        "interactive_n": 1
+      }
+    },
+    {
+      "id": "b4_centers",
+      "narration": "워크센터 맵. 왼쪽 목록을 고르면 오른쪽에 가동률 링과 상세가 열립니다. 다이어그램과 인포그래픽으로 구조를 보여 줍니다. 접힌 섹션을 열어 내용을 확인합니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#centers"
+      },
+      "clicks": [
+        {
+          "selector": "#centers-head",
+          "optional": true,
+          "why": "open accordion"
+        },
+        {
+          "selector": "#wcList > button.wc-item.on:nth-of-type(1)",
+          "optional": true,
+          "why": "demo button"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "centers",
+        "heading": "워크센터 맵",
+        "has_diagram": true,
+        "interactive_n": 8
+      }
+    },
+    {
+      "id": "b5_funnel",
+      "narration": "콘텐츠가 흐르는 방식. 단계를 클릭하면 완성도가 채워집니다. Grok 드래프트에서 독립까지. 다이어그램과 인포그래픽으로 구조를 보여 줍니다. 접힌 섹션을 열어 내용을 확인합니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#funnel"
+      },
+      "clicks": [
+        {
+          "selector": "#funnel-head",
+          "optional": true,
+          "why": "open accordion"
+        }
+      ],
+      "hold_after_ms": 500,
+      "scout_ref": {
+        "section_id": "funnel",
+        "heading": "콘텐츠가 흐르는 방식",
+        "has_diagram": true,
+        "interactive_n": 4
+      }
+    },
+    {
+      "id": "b6_economics",
+      "narration": "월 비용 인포그래픽. 코어는 0원에 가깝고, 시각·에이전트 풀은 SuperGrok이 담당. 다이어그램과 인포그래픽으로 구조를 보여 줍니다. 접힌 섹션을 열어 내용을 확인합니다. 핵심을 따라온 소개였습니다.",
+      "camera": {
+        "action": "scroll_to",
+        "selector": "#economics"
+      },
+      "clicks": [
+        {
+          "selector": "#economics-head",
+          "optional": true,
+          "why": "open accordion"
+        }
+      ],
+      "hold_after_ms": 800,
+      "scout_ref": {
+        "section_id": "economics",
+        "heading": "월 비용 인포그래픽",
+        "has_diagram": true,
+        "interactive_n": 1
+      }
+    }
+  ],
+  "from_scout": true,
+  "scout_stats": {
+    "sections": 10,
+    "interactives": 24
+  }
+}
