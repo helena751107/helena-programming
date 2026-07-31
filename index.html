@@ -99,7 +99,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:none}
 .ch-title em{font-style:italic;color:var(--teal-bright)}
 .ch-deck{max-width:540px;color:var(--ink-dim);font-size:1.05rem;font-weight:300;margin-bottom:40px}
 
-.cover{min-height:100vh;display:grid;place-items:center;position:relative;padding:100px 0 60px;overflow:hidden}
+.cover{min-height:min(100vh,920px);min-height:100dvh;display:grid;place-items:center;position:relative;padding:88px 0 48px;overflow:hidden}
 .cover-bg{position:absolute;inset:0;z-index:0;background:
   radial-gradient(ellipse 80% 60% at 72% 14%,rgba(61,184,168,.18),transparent 55%),
   radial-gradient(ellipse 50% 50% at 12% 78%,rgba(139,124,240,.08),transparent 50%),
@@ -218,37 +218,68 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:none}
 .acc-toolbar button{min-height:40px;padding:8px 14px;border:1px solid var(--rule-strong);background:var(--paper-2);color:var(--ink-dim);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:.25s}
 .acc-toolbar button:hover{border-color:var(--teal);color:var(--ink)}
 section.chapter.acc{border-top:1px solid var(--rule);padding:0}
-section.chapter.acc .acc-head{width:100%;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:6px 16px;align-items:center;text-align:left;padding:22px 0;min-height:64px;background:none;border:none;color:inherit;font:inherit;cursor:pointer}
+section.chapter.acc .acc-head{width:100%;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px 12px;align-items:center;text-align:left;padding:18px 0;min-height:56px;background:none;border:none;color:inherit;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 section.chapter.acc .acc-head .ch-label{grid-column:1/-1;margin-bottom:0;pointer-events:none}
-section.chapter.acc .acc-head .ch-title{margin:0;pointer-events:none;font-size:clamp(1.6rem,4vw,2.4rem)}
-section.chapter.acc .acc-ico{width:36px;height:36px;border:1px solid var(--rule-strong);display:grid;place-items:center;color:var(--teal);transition:transform .3s var(--ease);grid-row:2;justify-self:end}
+section.chapter.acc .acc-head .ch-title{margin:0;pointer-events:none;font-size:clamp(1.45rem,4vw,2.2rem)}
+section.chapter.acc .acc-ico{width:40px;height:40px;border:1px solid var(--rule-strong);display:grid;place-items:center;color:var(--teal);transition:transform .3s var(--ease);grid-row:2;justify-self:end;border-radius:8px;flex-shrink:0}
 section.chapter.acc .acc-head[aria-expanded="true"] .acc-ico{transform:rotate(45deg);background:color-mix(in srgb,var(--teal) 15%,transparent)}
 section.chapter.acc .acc-panel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
-section.chapter.acc .acc-panel > .acc-inner{overflow:hidden;min-height:0;opacity:0;transition:opacity .3s,padding .3s;padding-bottom:0}
+section.chapter.acc .acc-panel > .acc-inner{overflow:hidden;min-height:0;opacity:0;visibility:hidden;transition:opacity .3s,padding .3s,visibility .3s;padding-bottom:0}
 section.chapter.acc .acc-panel.open{grid-template-rows:1fr}
-section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(36px,6vw,72px)}
+section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;visibility:visible;padding-bottom:clamp(28px,5vw,56px)}
 
 @media(max-width:900px){
   .g3,.g4,.cover-stats{grid-template-columns:repeat(2,1fr)}
   .method-steps{grid-template-columns:repeat(2,1fr)}
   .method-steps .m-step:last-child{grid-column:1/-1}
-  .chapter-rail{display:none}
+  .chapter-rail{display:none!important}
   .menu-btn{display:grid;place-items:center}
   .masthead{grid-template-columns:1fr auto}
-  .mast-brand{justify-self:start}
+  .mast-brand{justify-self:start;font-size:.95rem}
   .mast-left{display:none}
-  .mast-right{position:fixed;top:0;right:0;bottom:0;width:min(300px,86vw);background:var(--paper-2);border-left:1px solid var(--rule);flex-direction:column;align-items:stretch;justify-content:flex-start;padding:72px 16px 24px;gap:4px;transform:translateX(105%);transition:transform .3s var(--ease);z-index:155}
+  .mast-right{position:fixed;top:0;right:0;bottom:0;width:min(300px,88vw);background:var(--paper-2);border-left:1px solid var(--rule);flex-direction:column;align-items:stretch;justify-content:flex-start;padding:max(72px,calc(env(safe-area-inset-top) + 56px)) 16px max(24px,env(safe-area-inset-bottom));gap:4px;transform:translateX(105%);transition:transform .3s var(--ease);z-index:155;overflow-y:auto}
   .mast-right.open{transform:translateX(0)}
-  .mast-right a,.mast-right button{justify-content:flex-start;width:100%;padding:14px 12px}
+  .mast-right a,.mast-right button{justify-content:flex-start;width:100%;padding:14px 12px;min-height:48px}
+  .cover{min-height:auto;padding:76px 0 36px}
+  .cover-cta .btn{min-height:48px;padding:14px 18px}
+  .term-strip{max-width:100%;font-size:.7rem;padding:10px 12px}
+  .infograph-box .hint{display:none}
+  .acc-toolbar{position:sticky;top:56px;z-index:80;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-top:8px;padding-bottom:8px;margin-bottom:4px}
+  .acc-toolbar button{min-height:44px;flex:1 1 auto}
 }
 @media(max-width:640px){
-  :root{--gutter:max(22px,calc(env(safe-area-inset-left,0px) + 16px));--gutter-r:max(22px,calc(env(safe-area-inset-right,0px) + 16px))}
+  :root{--gutter:max(18px,calc(env(safe-area-inset-left,0px) + 14px));--gutter-r:max(18px,calc(env(safe-area-inset-right,0px) + 14px))}
   .g2,.g3,.g4{grid-template-columns:1fr}
   .cover-stats{grid-template-columns:repeat(2,1fr)}
-  .method-steps{grid-template-columns:1fr}
+  .cover-stats .s{padding:14px 8px}
+  .cover-stats .v{font-size:1.45rem}
+  .cover-stats .l{font-size:.58rem;letter-spacing:.08em}
+  .method-steps{grid-template-columns:1fr;gap:8px}
+  .method-steps .m-step{min-height:0;padding:14px}
   .method-steps .m-step:last-child{grid-column:auto}
-  .cover h1{font-size:clamp(2.1rem,10.5vw,3.2rem);line-height:1.02}
-  section.chapter.acc .acc-head .ch-title{font-size:1.35rem}
+  .cover h1{font-size:clamp(2rem,9.5vw,2.8rem);line-height:1.05;margin-bottom:16px}
+  .cover-kicker{gap:8px 12px;margin-bottom:18px;font-size:.65rem}
+  .cover-sub{font-size:.95rem;margin-bottom:22px;padding-left:14px}
+  .cover-cta{gap:8px;margin-bottom:20px}
+  .cover-cta .btn{width:100%;justify-content:center;font-size:.75rem}
+  .pillar{padding:18px}
+  .pillar h3{font-size:1.3rem}
+  .pillar:hover,.pillar.active,.chan:hover,.m-step:hover,.m-step.active,.ed-card:hover{transform:none;box-shadow:none}
+  .chan,.ed-card{padding:18px}
+  .install-box{padding:16px;gap:12px}
+  .install-box code{font-size:.72rem;padding:12px;white-space:pre-wrap;word-break:break-all}
+  .svg-arch{min-width:480px}
+  section.chapter.acc .acc-head{padding:16px 0;min-height:60px}
+  section.chapter.acc .acc-head .ch-title{font-size:1.25rem}
+  section.chapter.acc .acc-head .ch-label{font-size:.65rem;gap:10px;letter-spacing:.14em}
+  .ch-deck{font-size:.95rem;margin-bottom:24px}
+  .marquee{font-size:.68rem}
+  .site-foot{padding:32px 0 max(56px,calc(env(safe-area-inset-bottom) + 40px));font-size:.78rem}
+  .to-top{width:48px;height:48px}
+  .note{font-size:.84rem;padding:14px}
+}
+@media(max-width:380px){
+  .cover h1{font-size:1.85rem}
 }
 @media(prefers-reduced-motion:reduce){
   .marquee,.svg-arch .flow,.reveal{animation:none!important;transition:none!important}
@@ -348,12 +379,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </div>
 
 <section class="chapter shell acc" id="pillars">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-pillars" data-panel="panel-pillars">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-pillars" data-panel="panel-pillars">
     <div class="ch-label"><span class="num">01</span><span>Dual stack</span><span class="line"></span></div>
     <h2 class="ch-title">두 축 · <em>온디바이스 × 웹</em></h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-pillars"><div class="acc-inner">
+  <div class="acc-panel" id="panel-pillars"><div class="acc-inner">
   <p class="ch-deck">콘텐츠 제작을 폰 앱과 웹 MCP로 나눕니다. 카드에 포커스가 가면 미터가 채워집니다.</p>
   <div class="g2">
     <article class="pillar reveal active" data-cursor style="--pc:var(--teal)" data-w="92">
@@ -407,12 +438,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </section>
 
 <section class="chapter shell acc" id="map">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-map" data-panel="panel-map">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-map" data-panel="panel-map">
     <div class="ch-label"><span class="num">02</span><span>Architecture</span><span class="line"></span></div>
     <h2 class="ch-title">폰에서 <em>클라우드</em>까지</h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-map"><div class="acc-inner">
+  <div class="acc-panel" id="panel-map"><div class="acc-inner">
   <p class="ch-deck">노드를 호버·탭하면 설명이 열립니다. 점선은 온디바이스 ↔ 웹MCP 흐름입니다.</p>
   <div class="infograph-box reveal" id="archBox">
     <span class="hint">Hover / tap nodes</span>
@@ -475,12 +506,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </section>
 
 <section class="chapter shell acc" id="pipeline">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-pipeline" data-panel="panel-pipeline">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-pipeline" data-panel="panel-pipeline">
     <div class="ch-label"><span class="num">03</span><span>Pipeline</span><span class="line"></span></div>
     <h2 class="ch-title">다섯 단 · <em>제작 파이프</em></h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-pipeline"><div class="acc-inner">
+  <div class="acc-panel" id="panel-pipeline"><div class="acc-inner">
   <p class="ch-deck">단계를 누르면 설명이 바뀝니다. 구조 레포 안에서 돌아가는 최소 흐름입니다.</p>
   <div class="method-steps" id="methodSteps">
     <div class="m-step active" data-i="0">
@@ -522,12 +553,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </section>
 
 <section class="chapter shell acc" id="rules">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-rules" data-panel="panel-rules">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-rules" data-panel="panel-rules">
     <div class="ch-label"><span class="num">04</span><span>Constitution</span><span class="line"></span></div>
     <h2 class="ch-title">네 조 · <em>불변 원칙</em></h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-rules"><div class="acc-inner">
+  <div class="acc-panel" id="panel-rules"><div class="acc-inner">
   <p class="ch-deck">에이전트 작업 전 필독. 상세는 레포 <code style="font-family:var(--mono);font-size:.85em;color:var(--teal)">CONSTITUTION.md</code>.</p>
   <div class="g2">
     <article class="ed-card reveal">
@@ -559,12 +590,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </section>
 
 <section class="chapter shell acc" id="channels">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-channels" data-panel="panel-channels">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-channels" data-panel="panel-channels">
     <div class="ch-label"><span class="num">05</span><span>Ecosystem</span><span class="line"></span></div>
     <h2 class="ch-title">허브와 <em>위성</em></h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-channels"><div class="acc-inner">
+  <div class="acc-panel" id="panel-channels"><div class="acc-inner">
   <p class="ch-deck">Helena 생태계 링크. 이 페이지는 프로그래밍 위성입니다.</p>
   <div class="g3">
     <a class="chan reveal" href="https://helena751107.github.io/helena_phone/" target="_blank" rel="noopener" data-cursor>
@@ -616,12 +647,12 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
 </section>
 
 <section class="chapter shell acc" id="install">
-  <button type="button" class="acc-head" aria-expanded="true" aria-controls="panel-install" data-panel="panel-install">
+  <button type="button" class="acc-head" aria-expanded="false" aria-controls="panel-install" data-panel="panel-install">
     <div class="ch-label"><span class="num">06</span><span>Install</span><span class="line"></span></div>
     <h2 class="ch-title">클론과 <em>배포</em></h2>
     <span class="acc-ico" aria-hidden="true">+</span>
   </button>
-  <div class="acc-panel open" id="panel-install"><div class="acc-inner">
+  <div class="acc-panel" id="panel-install"><div class="acc-inner">
   <p class="ch-deck">GitHub Pages는 이 루트 <code style="font-family:var(--mono);font-size:.85em;color:var(--teal)">index.html</code> 을 서빙합니다.</p>
   <div class="install-box reveal">
     <div>
@@ -779,12 +810,16 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
     });
   });
 
-  // accordion
+  // accordion — default all collapsed on load
   function setPanel(panel,open){
+    if(!panel)return;
     const head=document.querySelector('[data-panel="'+panel.id+'"]');
     panel.classList.toggle('open',open);
     if(head)head.setAttribute('aria-expanded',open?'true':'false');
   }
+  function collapseAll(){$$('.acc-panel').forEach(p=>setPanel(p,false))}
+  function expandAll(){$$('.acc-panel').forEach(p=>setPanel(p,true))}
+  collapseAll();
   $$('.acc-head').forEach(h=>{
     h.addEventListener('click',()=>{
       const panel=document.getElementById(h.dataset.panel);
@@ -793,8 +828,30 @@ section.chapter.acc .acc-panel.open > .acc-inner{opacity:1;padding-bottom:clamp(
     });
   });
   const openAll=$('#accOpenAll'),closeAll=$('#accCloseAll');
-  if(openAll)openAll.addEventListener('click',()=>$$('.acc-panel').forEach(p=>setPanel(p,true)));
-  if(closeAll)closeAll.addEventListener('click',()=>$$('.acc-panel').forEach(p=>setPanel(p,false)));
+  if(openAll)openAll.addEventListener('click',expandAll);
+  if(closeAll)closeAll.addEventListener('click',collapseAll);
+  // deep-link: #pillars etc. expands only that chapter
+  function openFromHash(){
+    const id=(location.hash||'').slice(1);
+    if(!id||id==='cover')return;
+    const sec=document.getElementById(id);
+    if(!sec||!sec.classList.contains('acc'))return;
+    const panel=sec.querySelector('.acc-panel');
+    if(panel)setPanel(panel,true);
+  }
+  openFromHash();
+  window.addEventListener('hashchange',openFromHash);
+  // cover CTAs that jump to a chapter: expand target
+  $$('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click',()=>{
+      const id=a.getAttribute('href').slice(1);
+      const sec=document.getElementById(id);
+      if(sec&&sec.classList.contains('acc')){
+        const panel=sec.querySelector('.acc-panel');
+        if(panel)setPanel(panel,true);
+      }
+    });
+  });
 })();
 </script>
 </body>
