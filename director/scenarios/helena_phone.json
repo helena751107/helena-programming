@@ -1,0 +1,67 @@
+{
+  "id": "helena_phone_intro",
+  "url": "https://helena751107.github.io/helena_phone/",
+  "title": "S21 PHONE — Webzine Vol.01",
+  "tone": "editorial tutorial",
+  "lang": "ko",
+  "voice": "ko-KR-SunHiNeural",
+  "duration_target_sec": 55,
+  "viewport": { "width": 720, "height": 1280 },
+  "logline": "갤럭시 한 대로 돌봄과 소망을 돌리는 AI 워크스테이션 웹진 소개.",
+  "beats": [
+    {
+      "id": "b0_cover",
+      "narration": "에스 이십일 폰. 갤럭시 한 대로 돌봄과 소망을 동시에 돌리는, 에이아이 워크스테이션 웹진입니다.",
+      "camera": { "action": "goto_top" },
+      "clicks": [],
+      "hold_after_ms": 600
+    },
+    {
+      "id": "b1_tracks",
+      "narration": "첫 축은 트랙입니다. 돌봄과 소망. 壊れ면 안 되는 것과, 실험해도 되는 것을 한 화면에서 나눕니다.",
+      "camera": { "action": "scroll_to", "selector": "#tracks" },
+      "clicks": [
+        { "selector": "#tracks .acc-head, #tracks button.acc-head", "optional": true }
+      ],
+      "hold_after_ms": 500
+    },
+    {
+      "id": "b2_system",
+      "narration": "시스템 맵. 인포그래픽으로 아키텍처를 보여 줍니다. 노드를 따라가면 공장의 뼈대가 보입니다.",
+      "camera": { "action": "scroll_to", "selector": "#system" },
+      "clicks": [
+        { "selector": "#system .acc-head, #system button.acc-head", "optional": true },
+        { "selector": "#archBox .node, #system .svg-arch .node", "optional": true }
+      ],
+      "hold_after_ms": 500
+    },
+    {
+      "id": "b3_agents",
+      "narration": "세 동료. 그록은 디자이너, 에이더는 작업 반장, 클로드는 감사. 역할이 다른 에이전트가 한 파이프에 섭니다.",
+      "camera": { "action": "scroll_to", "selector": "#agents" },
+      "clicks": [
+        { "selector": "#agents .acc-head, #agents button.acc-head", "optional": true }
+      ],
+      "hold_after_ms": 400
+    },
+    {
+      "id": "b4_install",
+      "narration": "설치는 초심자 삼 화면. 터미널 한 줄로 시작하는 길을 웹진 안에 심어 두었습니다.",
+      "camera": { "action": "scroll_to", "selector": "#install" },
+      "clicks": [
+        { "selector": "#install .acc-head, #install button.acc-head", "optional": true },
+        { "selector": "#replayType", "optional": true }
+      ],
+      "hold_after_ms": 400
+    },
+    {
+      "id": "b5_channels",
+      "narration": "깃허브는 공장, 유튜브는 강단, 네이버는 칠판. 한 사람의 목소리가 여러 채널로 흩어지고, 다시 웹진으로 모입니다. 에스 이십일 폰. 웹진 볼륨 원.",
+      "camera": { "action": "scroll_to", "selector": "#channels" },
+      "clicks": [
+        { "selector": "#channels .acc-head, #channels button.acc-head", "optional": true }
+      ],
+      "hold_after_ms": 800
+    }
+  ]
+}
