@@ -1,0 +1,40 @@
+# Helena Studio APK 빌드
+# 트리거: 수동 (workflow_dispatch) 또는 apps/helena-studio/** 변경 시
+
+name: Build Helena Studio APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/helena-studio/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK
+        working-directory: apps/helena-studio
+        run: |
+          flutter pub get
+          flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helena-studio-apk
+          path: apps/helena-studio/build/app/outputs/flutter-apk/app-release.apk

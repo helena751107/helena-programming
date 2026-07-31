@@ -1,0 +1,37 @@
+# Vercel 배포 — 웹MCP + 대시보드
+# 트리거: web/** 변경 시 자동 배포
+
+name: Deploy to Vercel
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'web/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          cd web
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes
+
+      - name: Deploy MCP Server (Python)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID_MCP: ${{ secrets.VERCEL_PROJECT_ID_MCP }}
+        run: |
+          cd mcp
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes || true

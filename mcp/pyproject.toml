@@ -1,0 +1,14 @@
+[project]
+name = "helena-studio-mcp"
+version = "0.1.0"
+description = "Helena Studio MCP Server — 온디바이스 + 웹MCP"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.helena]
+domains = ["on-device", "web-mcp"]
+fridge_deps = [
+    "dtslib1979/parksy-audio",   # RVC 음성, MCP 패턴
+    "dtslib1979/parksy-image",   # 도면, 웹툰, 썸네일
+    "dtslib1979/dtslib-apk-lab", # APK 빌드 구조
+]

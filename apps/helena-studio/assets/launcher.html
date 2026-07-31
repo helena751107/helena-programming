@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helena Studio — Launcher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem;
+  }
+  h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  p { color: #94a3b8; margin-bottom: 2rem; }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem; width: 100%; max-width: 800px;
+  }
+  .card {
+    background: #1e293b; border-radius: 12px; padding: 1.5rem;
+    border: 1px solid #334155; transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #6366f1; }
+  .card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.85rem; color: #64748b; margin: 0; }
+  .domain-badge {
+    display: inline-block; font-size: 0.7rem; padding: 0.2rem 0.5rem;
+    border-radius: 4px; margin-bottom: 0.5rem;
+  }
+  .on-device { background: #172554; color: #93c5fd; }
+  .web-mcp { background: #1a2e1a; color: #86efac; }
+</style>
+</head>
+<body>
+<h1>🎨 Helena Studio</h1>
+<p>온디바이스 + 웹MCP 콘텐츠 스튜디오 v0.1.0</p>
+
+<div class="grid">
+  <div class="card">
+    <span class="domain-badge on-device">📱 온디바이스</span>
+    <h3>다이어그램 생성</h3>
+    <p>Mermaid → SVG 렌더링 → 합성</p>
+  </div>
+  <div class="card">
+    <span class="domain-badge on-device">📱 온디바이스</span>
+    <h3>음성 더빙</h3>
+    <p>RVC 음성 클론 → 더빙 트랙</p>
+  </div>
+  <div class="card">
+    <span class="domain-badge on-device">📱 온디바이스</span>
+    <h3>SVG 합성</h3>
+    <p>도면·웹툰 자산 → 웹페이지 조립</p>
+  </div>
+  <div class="card">
+    <span class="domain-badge web-mcp">🌐 웹MCP</span>
+    <h3>MCP 서버</h3>
+    <p>API 엔드포인트 · 원격 렌더링</p>
+  </div>
+  <div class="card">
+    <span class="domain-badge web-mcp">🌐 웹MCP</span>
+    <h3>대시보드</h3>
+    <p>콘텐츠 현황 · 배포 상태</p>
+  </div>
+  <div class="card">
+    <span class="domain-badge web-mcp">🌐 웹MCP</span>
+    <h3>Vercel 배포</h3>
+    <p>Git Push → 자동 배포</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helena Studio — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    min-height: 100vh; padding: 2rem;
+  }
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 1.8rem; }
+  .header p { color: #64748b; margin-top: 0.25rem; }
+  .status-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: #1e293b; border-radius: 8px; padding: 1.25rem;
+    border: 1px solid #334155;
+  }
+  .stat-card .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+  .stat-card .value { font-size: 1.5rem; font-weight: bold; margin-top: 0.25rem; }
+  .stat-card .value.green { color: #4ade80; }
+  .stat-card .value.blue { color: #60a5fa; }
+  .tools { background: #1e293b; border-radius: 8px; padding: 1.5rem; border: 1px solid #334155; }
+  .tools h2 { margin-bottom: 1rem; }
+  .tool-item {
+    padding: 0.75rem; border-bottom: 1px solid #334155;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tool-item:last-child { border-bottom: none; }
+  .tool-name { font-weight: 600; }
+  .tool-domain {
+    font-size: 0.7rem; padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+  }
+  .tool-domain.on-device { background: #172554; color: #93c5fd; }
+  .tool-domain.web-mcp { background: #1a2e1a; color: #86efac; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎨 Helena Studio</h1>
+  <p>Dashboard v0.1.0 — 콘텐츠 파이프 현황</p>
+</div>
+
+<div class="status-grid">
+  <div class="stat-card">
+    <div class="label">MCP 상태</div>
+    <div class="value green">● Online</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">도구</div>
+    <div class="value blue" id="toolCount">-</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">도메인</div>
+    <div class="value">2</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">버전</div>
+    <div class="value">0.1.0</div>
+  </div>
+</div>
+
+<div class="tools">
+  <h2>🛠️ MCP 도구</h2>
+  <div class="tool-item">
+    <span class="tool-name">render_diagram</span>
+    <span class="tool-domain on-device">📱 온디바이스</span>
+  </div>
+  <div class="tool-item">
+    <span class="tool-name">compose_page</span>
+    <span class="tool-domain web-mcp">🌐 웹MCP</span>
+  </div>
+  <div class="tool-item">
+    <span class="tool-name">voice_dub</span>
+    <span class="tool-domain on-device">📱 온디바이스</span>
+  </div>
+</div>
+
+<script>
+fetch('/api/mcp')
+  .then(r => r.json())
+  .then(d => { document.getElementById('toolCount').textContent = d.tools; })
+  .catch(() => { document.getElementById('toolCount').textContent = '?'; });
+</script>
+</body>
+</html>

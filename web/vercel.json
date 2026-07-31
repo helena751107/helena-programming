@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/mcp/index.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    { "src": "/api/mcp", "dest": "/api/mcp" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
+}

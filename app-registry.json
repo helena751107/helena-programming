@@ -1,0 +1,25 @@
+[
+  {
+    "id": "helena-studio",
+    "name": "Helena Studio",
+    "package": "com.helena.studio",
+    "directory": "apps/helena-studio",
+    "version": "0.1.0",
+    "version_code": 1,
+    "status": "scaffold",
+    "download_active": false,
+    "category": "creative",
+    "overlay": false,
+    "description": "온디바이스 콘텐츠 스튜디오 — 다이어그램·음성더빙·SVG합성",
+    "icon_emoji": "🎨",
+    "release_tag": null,
+    "workflow": "build-apk.yml",
+    "source_origin": "original",
+    "theme_strategy": "constants_class",
+    "compile_sdk": 35,
+    "min_sdk": 26,
+    "target_sdk": 34,
+    "java_version": "17",
+    "domains": ["on-device", "web-mcp"]
+  }
+]

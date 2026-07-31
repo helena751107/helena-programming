@@ -1,0 +1,20 @@
+# Constitution Guard — CONSTITUTION.md 변경 감지
+# dtslib-apk-lab 패턴 계승
+
+name: Constitution Guard
+
+on:
+  pull_request:
+    paths:
+      - 'CONSTITUTION.md'
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Constitution 변경 알림
+        run: |
+          echo "⚠️  CONSTITUTION.md 변경 감지"
+          echo "이 파일은 프로젝트의 불변 원칙을 정의합니다."
+          echo "변경 전 반드시 Boss 승인을 받으세요."

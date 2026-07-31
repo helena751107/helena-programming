@@ -1,0 +1,18 @@
+name: helena_studio
+description: Helena Studio — 온디바이스 + 웹MCP 콘텐츠 스튜디오. 다이어그램·음성더빙·SVG합성.
+version: 0.1.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.4.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/launcher.html

@@ -1,0 +1,14 @@
+{
+  "id": "helena-studio",
+  "name": "Helena Studio",
+  "package": "com.helena.studio",
+  "version": "0.1.0",
+  "domains": {
+    "on_device": ["diagram", "voice_dub", "svg_compose"],
+    "web_mcp": ["api", "dashboard", "render"]
+  },
+  "play_store": {
+    "track": "internal",
+    "store_listing": false
+  }
+}
