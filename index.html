@@ -2,502 +2,372 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f172a">
-<meta name="description" content="웹페이지 URL → TTS + Canvas → 영상 생성 + 클립 이어붙이기. S21 단독, 0원.">
-<title>Helena Studio — 웹페이지→영상 + 이어붙이기</title>
-<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>냉장고(Fridge) 아키텍처 — dtslib1979 ⇄ helena751107 자산 공유 체계</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
-:root { --bg:#0f172a; --surface:#1e293b; --border:#334155; --text:#e2e8f0;
-  --muted:#64748b; --accent:#6366f1; --accent2:#818cf8; }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:2rem; }
-.hidden { display:none !important; }
+:root{
+  --bg:#050510; --bg2:#0a0a20; --surface:rgba(255,255,255,0.03);
+  --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.1);
+  --text:#e8e8f0; --text2:rgba(255,255,255,0.65); --text3:rgba(255,255,255,0.35);
+  --accent:#818cf8; --accent2:#6366f1; --accent-glow:rgba(99,102,241,0.3);
+  --gold:#f59e0b; --gold-glow:rgba(245,158,11,0.2);
+  --green:#34d399; --red:#f87171; --pink:#f472b6; --cyan:#22d3ee;
+  --font:'Inter','Noto Sans KR',system-ui,sans-serif;
+  --transition:0.5s cubic-bezier(0.16,1,0.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;height:100vh}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 
-.header { text-align:center; padding:1.5rem 1rem .5rem; }
-.header h1 { font-size:1.4rem; }
-.header h1 span { color:var(--accent2); }
-.header p { color:var(--muted); font-size:.8rem; margin-top:.2rem; }
+/* 배경 파티클 */
+.bg-particles{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bg-particles .orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.08;animation:float 20s infinite ease-in-out}
+.bg-particles .orb:nth-child(1){width:600px;height:600px;background:var(--accent);top:-200px;left:-100px;animation-delay:0s}
+.bg-particles .orb:nth-child(2){width:400px;height:400px;background:var(--pink);bottom:-100px;right:-100px;animation-delay:-7s}
+.bg-particles .orb:nth-child(3){width:500px;height:500px;background:var(--cyan);top:50%;left:50%;animation-delay:-14s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(100px,-50px) scale(1.1)}50%{transform:translate(-50px,100px) scale(0.9)}75%{transform:translate(-100px,-100px) scale(1.05)}}
 
-/* 탭 */
-.tabs { display:flex; gap:.25rem; margin:1rem 1rem 0; max-width:600px; margin-left:auto; margin-right:auto; }
-.tab { flex:1; padding:.6rem; text-align:center; cursor:pointer; border-radius:10px 10px 0 0;
-  font-size:.8rem; font-weight:600; background:var(--surface); color:var(--muted);
-  border:1px solid var(--border); border-bottom:none; transition:all .2s; }
-.tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+/* 내비게이션 바 */
+.navbar{position:fixed;top:0;left:0;right:0;z-index:100;padding:1rem 1.5rem;
+  background:rgba(5,5,16,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}
+.navbar .logo{font-weight:800;font-size:1rem;letter-spacing:-0.02em;flex:1}
+.navbar .logo span{color:var(--accent)}
+.nav-dots{display:flex;gap:6px}
+.nav-dot{width:10px;height:10px;border-radius:50%;background:var(--border2);cursor:pointer;transition:all 0.3s;position:relative}
+.nav-dot.active{background:var(--accent);box-shadow:0 0 12px var(--accent-glow);transform:scale(1.2)}
+.nav-dot.done{background:var(--green)}
+.nav-btn{padding:.5rem 1rem;border:1px solid var(--border2);border-radius:8px;
+  background:rgba(255,255,255,0.03);color:var(--text);cursor:pointer;
+  font-size:.8rem;font-weight:500;transition:all 0.2s;font-family:var(--font)}
+.nav-btn:hover{border-color:var(--accent);background:rgba(99,102,241,0.1)}
+.nav-btn.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
+.nav-btn.primary:hover{background:var(--accent);box-shadow:0 0 20px var(--accent-glow)}
+.nav-btn.primary.playing{background:#dc2626;border-color:#dc2626}
 
-.card { background:var(--surface); border:1px solid var(--border); border-radius:0 0 12px 12px;
-  padding:1.25rem; margin:0 1rem 1rem; max-width:600px; margin-left:auto; margin-right:auto; }
-.card.standalone { border-radius:12px; }
-.card h3 { font-size:.85rem; margin-bottom:.75rem; color:var(--accent2); }
+/* 섹션 */
+.slide{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:5rem 2rem 3rem;position:relative;z-index:1;
+  scroll-snap-align:start;scroll-snap-stop:always}
+.slide-inner{width:100%;max-width:900px}
+.slide-num{font-size:.75rem;font-weight:600;letter-spacing:0.15em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:1rem}
+.slide h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.2;
+  letter-spacing:-0.03em;margin-bottom:2rem;background:linear-gradient(135deg,var(--text) 0%,var(--text2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.slide h2 .hl{color:var(--accent);-webkit-text-fill-color:var(--accent)}
 
-input, textarea, select { width:100%; background:var(--bg); border:1px solid var(--border);
-  color:var(--text); padding:.7rem; border-radius:8px; font-size:.85rem; margin-bottom:.5rem; }
-input:focus, textarea:focus { border-color:var(--accent2); outline:none; }
-textarea { resize:vertical; min-height:60px; }
+/* 글래스 카드 */
+.glass{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:2rem;margin-bottom:1rem;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:all 0.3s}
+.glass:hover{border-color:var(--border2);background:rgba(255,255,255,0.04)}
+.glass p{font-size:1.05rem;line-height:1.75;color:var(--text2);margin-bottom:.75rem}
+.glass p:last-child{margin-bottom:0}
 
-.btn { padding:.7rem 1.2rem; border:none; border-radius:10px; cursor:pointer;
-  font-size:.85rem; font-weight:700; transition:all .2s; }
-.btn:active { transform:scale(.97); }
-.btn-primary { background:var(--accent); color:#fff; width:100%; }
-.btn-primary:disabled { opacity:.4; }
-.btn-sm { padding:.4rem .8rem; font-size:.75rem; border-radius:6px; }
-.btn-outline { background:transparent; color:var(--accent2); border:1px solid var(--accent2); }
-.btn-danger { background:#dc2626; color:#fff; }
-.btn-success { background:#16a34a; color:#fff; width:100%; }
+/* 아코디언 */
+.accordion{margin-bottom:.5rem;border-radius:14px;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);transition:all 0.3s}
+.accordion-header{padding:1.2rem 1.5rem;cursor:pointer;display:flex;
+  align-items:center;justify-content:space-between;user-select:none;
+  font-weight:600;font-size:1rem;transition:all 0.2s}
+.accordion-header:hover{background:rgba(255,255,255,0.02)}
+.accordion-arrow{font-size:.7rem;transition:transform 0.3s;color:var(--text3)}
+.accordion.open .accordion-arrow{transform:rotate(180deg);color:var(--accent)}
+.accordion-body{max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}
+.accordion.open .accordion-body{max-height:2000px;padding:0 1.5rem 1.5rem}
+.accordion-body p{font-size:.95rem;line-height:1.7;color:var(--text2)}
 
-/* 클립 리스트 */
-.clip-list { display:flex; flex-direction:column; gap:.4rem; min-height:40px; }
-.clip-item { display:flex; align-items:center; gap:.5rem; padding:.6rem;
-  background:var(--bg); border-radius:8px; border:1px solid var(--border); font-size:.8rem; }
-.clip-num { color:var(--accent2); font-weight:700; min-width:1.2rem; font-size:.75rem; }
-.clip-url { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
-.clip-status { font-size:.7rem; min-width:3rem; text-align:right; }
-.clip-status.done { color:#4ade80; }
-.clip-status.wait { color:var(--muted); }
-.clip-actions { display:flex; gap:2px; }
-.clip-actions button { background:none; border:none; color:var(--muted); cursor:pointer;
-  padding:2px 4px; font-size:.7rem; border-radius:3px; }
-.clip-actions button:hover { color:var(--text); }
+/* 인포그래픽 그리드 */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:1.5rem 0}
+.info-tile{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.02));
+  border:1px solid var(--border);border-radius:16px;padding:1.5rem;text-align:center;
+  transition:all 0.3s;position:relative;overflow:hidden}
+.info-tile::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity 0.3s}
+.info-tile:hover{border-color:var(--accent);transform:translateY(-2px)}
+.info-tile:hover::before{opacity:1}
+.info-tile .val{font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,var(--accent),#c084fc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.info-tile .lbl{font-size:.75rem;color:var(--text3);margin-top:.4rem;font-weight:500}
 
-/* Add URL row */
-.add-row { display:flex; gap:.4rem; margin-bottom:.5rem; }
-.add-row input { flex:1; margin-bottom:0; }
-.add-row button { flex-shrink:0; }
+/* 하이라이트 카드 */
+.hl-card{background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.01));
+  border:1px solid rgba(245,158,11,0.15);border-radius:16px;padding:1.5rem;margin:1rem 0}
+.hl-card .icon{font-size:1.5rem;margin-bottom:.5rem}
+.hl-card p{font-size:.95rem;line-height:1.7;color:var(--text2)}
+.hl-card strong{color:var(--gold)}
 
-/* Voice */
-.voice-row { display:flex; gap:.4rem; margin-bottom:.5rem; }
-.voice-row select { margin-bottom:0; }
+/* 테이블 */
+.table-glass{overflow-x:auto;margin:1rem 0;border-radius:14px;border:1px solid var(--border)}
+.table-glass table{width:100%;border-collapse:collapse;font-size:.9rem}
+.table-glass th{background:rgba(99,102,241,0.15);color:var(--accent);padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em}
+.table-glass td{padding:.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text2)}
+.table-glass tr:last-child td{border-bottom:none}
+.table-glass tr:hover td{background:rgba(255,255,255,0.02)}
 
-/* Progress */
-.progress-section { margin:0 1rem .5rem; max-width:600px; margin-left:auto; margin-right:auto; }
-.progress-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
-.progress-fill { height:100%; background:var(--accent); width:0%; transition:width .3s; }
-.progress-text { font-size:.75rem; color:var(--muted); margin-top:.2rem; }
+/* 리스트 */
+.glass-list{list-style:none}
+.glass-list li{padding:.8rem 1rem;margin:.3rem 0;border-left:2px solid var(--accent);
+  background:rgba(99,102,241,0.03);border-radius:0 8px 8px 0;font-size:.9rem;color:var(--text2);transition:all 0.2s}
+.glass-list li:hover{border-left-width:4px;background:rgba(99,102,241,0.06)}
 
-/* Preview */
-.preview { margin:0 1rem 1rem; max-width:600px; margin-left:auto; margin-right:auto;
-  background:var(--surface); border-radius:12px; overflow:hidden; border:1px solid var(--border); }
-.preview video { width:100%; display:block; }
-.preview .bar { padding:.6rem; display:flex; justify-content:space-between; align-items:center; font-size:.8rem; }
-.preview .bar span { color:var(--muted); }
+/* 다이어그램 */
+.mermaid-glass{background:rgba(255,255,255,0.98);border-radius:14px;padding:1.5rem;margin:1rem 0;overflow-x:auto}
 
-/* Log */
-.log { margin:0 1rem; max-width:600px; margin-left:auto; margin-right:auto;
-  font-size:.7rem; color:var(--muted); max-height:120px; overflow-y:auto; }
-.log .ok { color:#4ade80; }
-.log .err { color:#f87171; }
-.log .i { color:#60a5fa; }
+/* 코드 */
+.code-glass{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:1.2rem;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.8rem;color:#a6adc8;line-height:1.6;margin:1rem 0}
+
+/* TTS 인디케이터 */
+.tts-badge{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:200;
+  background:var(--accent2);color:#fff;padding:.6rem 1.8rem;border-radius:30px;
+  font-size:.85rem;font-weight:600;display:none;box-shadow:0 8px 30px var(--accent-glow);
+  animation:pulse 1.5s infinite;letter-spacing:-0.01em}
+.tts-badge.on{display:block}
+@keyframes pulse{0%,100%{opacity:1;transform:translateX(-50%) scale(1)}50%{opacity:.85;transform:translateX(-50%) scale(1.03)}}
+
+/* 진행바 */
+.progress-fixed{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc);z-index:200;transition:width 0.5s ease;border-radius:0 2px 2px 0}
+
+/* 반응형 */
+@media(max-width:768px){
+  .slide{padding:4rem 1rem 2rem}
+  .glass{padding:1.25rem}
+  .info-grid{grid-template-columns:repeat(2,1fr)}
+  .navbar{padding:.75rem 1rem;gap:.5rem}
+  .nav-btn{padding:.4rem .7rem;font-size:.7rem}
+}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>🎬 Helena <span>Studio</span></h1>
-  <p>웹페이지 → 영상 생성 + 클립 이어붙이기 · S21 · 0원</p>
+<div class="bg-particles">
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
 </div>
-
-<div class="tabs">
-  <button class="tab active" onclick="switchTab('generate')">🎥 영상 생성</button>
-  <button class="tab" onclick="switchTab('stitch')">🔗 클립 이어붙이기</button>
+<div class="progress-fixed" id="progressBar" style="width:0%"></div>
+<div class="navbar">
+  <div class="logo">🎬 <span>Helena</span> Studio</div>
+  <div class="nav-dots" id="navDots"></div>
+  <button class="nav-btn primary" id="playBtn" onclick="togglePlay()">▶ Play All</button>
+  <button class="nav-btn" onclick="exportVideo()">📥 저장</button>
 </div>
+<div class="tts-badge" id="ttsBadge">🔊 읽는 중...</div>
 
-<!-- ════════════════════════════════════════════════════  TAB: GENERATE  ═══ -->
-<div id="tab-generate">
-  <div class="card">
-    <h3>🌐 웹페이지 URL</h3>
-    <input type="url" id="genUrl" placeholder="https://helena751107.github.io/helena-piano/"
-           value="https://helena751107.github.io/helena-piano/">
-    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.25rem;">
-      <select id="genVoice" style="margin-bottom:0;"></select>
-    </div>
-  </div>
-  <div class="card standalone">
-    <h3>🎬 생성 <span style="font-weight:400;font-size:.7rem;color:var(--muted)">(최대 8섹션·400자/섹션)</span></h3>
-    <button class="btn btn-primary" id="genBtn" onclick="generateOne()">영상 생성</button>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════  TAB: STITCH  ═══ -->
-<div id="tab-stitch" class="hidden">
-  <div class="card">
-    <h3>➕ 클립 추가 (URL 여러 개 · 최대 <span id="maxClips">5</span>개)</h3>
-    <div class="add-row">
-      <input type="url" id="stitchUrl" placeholder="https://... 새 클립 URL">
-      <button class="btn btn-sm btn-outline" id="addClipBtn" onclick="addClip()">+ 추가</button>
-    </div>
-    <div class="clip-list" id="clipList">
-      <div style="color:var(--muted);font-size:.8rem;text-align:center;padding:.5rem;">
-        URL을 추가하세요
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>🎙️ TTS 음성</h3>
-    <select id="stitchVoice" style="margin-bottom:0;"></select>
-  </div>
-
-  <div class="card standalone">
-    <h3>🔗 모두 이어붙이기</h3>
-    <button class="btn btn-success" id="stitchBtn" onclick="stitchAll()" disabled>
-      영상 이어붙이기 (<span id="clipCount">0</span>개 클립)
-    </button>
-  </div>
-</div>
-
-<!-- Progress + Preview + Log (shared) -->
-<div class="progress-section hidden" id="progressSection">
-  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-  <div class="progress-text" id="progressText"></div>
-</div>
-
-<div class="preview hidden" id="previewSection">
-  <video id="previewVideo" controls></video>
-  <div class="bar">
-    <span id="previewInfo"></span>
-    <button class="btn btn-sm btn-outline" onclick="downloadVideo()">📥 다운로드</button>
-  </div>
-</div>
-
-<div class="log" id="log"></div>
+<div id="slides"></div>
 
 <script>
-// ── LIMITS ──
-const LIMIT = {
-  maxSections: 8,      // 영상당 최대 섹션
-  maxClips: 5,         // 이어붙이기 최대 클립 수
-  maxBodyChars: 400,   // 섹션당 최대 글자
-  maxSectionChars: 3000 // 한 섹션 TTS 최대 글자
-};
+const SECTIONS = [{"title": "냉장고(Fridge) 아키텍처 — dtslib1979 ⇄ helena751107 자산 공유 체계", "blocks": [{"type": "p", "content": "> 선언: 2026-07-31 (Claude, Boss 승인) > 헌법 근거: CONSTITUTION.md 제2조(코드는 선물) · 제6조(판단력=희소자산) > 관계 문서: 99-devlog.md §97–98"}]}, {"title": "1. 정의", "blocks": [{"type": "p", "content": "냉장고(Fridge) 란, dtslib1979(창작자)가 구축한 모든 코드·에셋·실험·템플릿을 helena751107(수혜자·누나·대필작가)에게 GitHub 콜라보레이터 권한으로 즉시 공유하는 자산 전달 체계다."}, {"type": "p", "content": "포크도, PR도, 서브모듈도 아니다. 공동 소유(shared ownership) 다."}]}, {"title": "2. 냉장고에 들어 있는 것", "blocks": []}, {"title": "dtslib1979 소유 — 28종 (27🔒 + 1🌐)", "blocks": [{"type": "table", "content": "| 레포 | 내용 | 핵심 자산 |\n|------|------|-----------|\n| `dtslib-papyrus` | 디지털 명함·선물 패키지 원산지 | 33파일·9,240줄 — CONSTITUTION 제2조의 실물 증거 |\n| `dtslib-branch` | 보일러플레이트 + 실물 모델 | 브랜치 전략·템플릿 |\n| `dtslib-cloud-appstore` | 클라우드 앱 배포 실험 (Python) | 배포 파이프라인 |\n| `dtslib-localpc` | 로컬PC 실행 노드 (Python) | WSL·로컬 자동화·오프라인 워크플로우 |\n| `dtslib-apk-lab` | APK 빌드 실험실 (Dart) 🌐 | 안드로이드 패키징 |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `gohsy` | gohsy comes true — 브랜드 루트 |\n| `gohsy-fashion` | DONGSEON Studio — 비즈니스 디지털 스튜디오 |\n| `gohsy-production` | 3-Lane 방송 스튜디오 프로토콜 (News/Recording/Stage) |\n| `espiritu-tango` | Tango Magenta — 콘텐츠 방송 아키텍처 |\n| `artrew` | KOOSY 자매 사이트 |\n| `koosy` | 셀럽 스토리 편집 방송 ⭐2 |"}, {"type": "table", "content": "| 레포 | 내용 | 규모/특징 |\n|------|------|-----------|\n| `parksy-audio` | 오디오·내레이션·MIDI 추출·렌더링 | ~986MB, steal.py→demucs→basic-pitch 파이프, TG 봇(36KB) |\n| `parksy-image` | 썸네일·AI 비디오 시드 | WH 연동 |\n| `parksy-logs` | Android Share Intent → 자동 텍스트 캡처 | Python, 개인 아카이브 |\n| `parksy.kr` | EduArt 엔지니어 마도서 — 디지털 지식 아카이브 | |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `termux-bridge` | **PC↔Termux 간극 메우기** — QA·CDP 스크린샷·모바일 개발 |\n| `OrbitPrompt` | 다중 쿼리 생성 엔진 → AI 파이프 |\n| `eae-univ` | AI 시대 온라인 학습 플랫폼 — YouTube + PWA |\n| `eae.kr` | EAE PWA Books — React + Vite + MDX + Pages ⭐1 |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `abraham` | 에이브럼 — 족발집 실운영자 + YouTube 크리에이터 |\n| `papafly` | 파파플라이 인큐베이션 |\n| `buckleychang.com` | Buckley Chang CPA — AI 경제 리얼리티 인터페이스 |\n| `buddies.kr` | 실물 유통·지역 비즈니스 |\n| `namoneygoal` | 길드형 부동산·로컬 비즈니스 실험 |\n| `phoneparis` | 폰 유통·현장 판매 실험 |\n| `hoyadang.com` | 레스토랑 프로토콜 (espiritu-tango fork) |\n| `alexandria-sanctuary` | 팔공산 글로벌 스피리추얼 케어 커뮤니티 |\n| `dtslib.kr` | DTSLIB 경제방송 허브 — 코드·사업·현장 연결 |"}]}, {"title": "helena751107 소유 — 6종 (전부 🌐)", "blocks": [{"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `helena_phone` | **메인 워크스페이스** — S21 폰·Termux·AI 에이전트·문서 |\n| `helana_log` | 기술 로그 — APK 리버싱·MCP·LLM |\n| `helena-faith` | 가족 신앙사 — 신학·묵상·찬양 아카이브 |\n| `helena-piano` | 피아노 종합 — MIDI·REAPER·AI 음원·BGM Studio |\n| `helena-psycare` | 멘탈케어 — 정신분석·MCP 모델·치료 기록 |\n| `helana-faith` | (중복 가능성 — ecosystem-map 미등록) |"}]}, {"title": "3. 냉장고 vs 기존 협업 모델", "blocks": [{"type": "table", "content": "| | Fork | PR | Submodule | **냉장고 (콜라보)** |\n|---|---|---|---|---|\n| 방향 | 단방향 복사 | 단방향 제안 | 읽기전용 참조 | **쌍방향 RW** |\n| 원본 접근 | 내 사본만 | merge 후 | 고정 커밋 | **실시간 최신** |\n| AI가 쓰려면 | fork 따로 clone | PR 따로 생성 | submodule init | **바로 `gh repo clone`** |\n| 자산 철학 | \"빌려 씀\" | \"기여함\" | \"참조함\" | **\"내 것도 네 것\"** |\n| 갱신 | upstream pull | merge 기다림 | 수동 업데이트 | **즉시 반영** |"}]}, {"title": "4. AI 에이전트가 냉장고를 쓰는 패턴", "blocks": []}, {"title": "4.1 재고 확인", "blocks": [{"type": "code", "content": "# 전체 28종 인벤토리\ngh api /user/repos \\\n  --jq '[.[] | select(.owner.login == \"dtslib1979\")] | .[] | \"\\(.name) | \\(.description)\"'", "lang": "bash"}]}, {"title": "4.2 특정 자산 즉시 복제", "blocks": [{"type": "code", "content": "# termux-bridge 필요하면:\ngh repo clone dtslib1979/termux-bridge /root/fridge/termux-bridge\n\n# parksy-audio 파이프 필요하면:\ngh repo clone dtslib1979/parksy-audio /root/fridge/parksy-audio", "lang": "bash"}]}, {"title": "4.3 파일 단위 참조 (clone 없이)", "blocks": [{"type": "code", "content": "# README만 읽기\ngh api repos/dtslib1979/parksy-audio/contents/README.md --jq '.content' | base64 -d\n\n# 특정 디렉토리 구조 파악\ngh api repos/dtslib1979/termux-bridge/contents/app/ --jq '.[].name'", "lang": "bash"}]}, {"title": "4.4 전체 싱크 (최초 1회)", "blocks": [{"type": "code", "content": "mkdir -p /root/fridge\nfor r in $(gh api /user/repos --jq '[.[]|select(.owner.login==\"dtslib1979\")].name[]'); do\n  [ -d \"/root/fridge/$r\" ] && git -C \"/root/fridge/$r\" pull --ff-only \\\n    || gh repo clone \"dtslib1979/$r\" \"/root/fridge/$r\"\ndone", "lang": "bash"}]}, {"title": "5. 헌법적 의미", "blocks": []}];
+let idx=0,playing=false;
 
-// ── STATE ──
-const S = {
-  mode: 'generate',
-  voices: [],
-  voiceIdx: 0,
-  clips: [],
-  resultBlob: null,
-  resultUrl: null
-};
+mermaid.initialize({startOnLoad:false,theme:'base',themeVariables:{primaryColor:'#818cf8',primaryTextColor:'#1e1b4b',primaryBorderColor:'#6366f1',lineColor:'#6366f1',secondaryColor:'#f0abfc',tertiaryColor:'#e0e7ff'}});
 
-// ── INIT ──
-document.addEventListener('DOMContentLoaded', () => {
-  loadVoices();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+document.addEventListener('DOMContentLoaded',()=>{
+  renderSlides();
+  renderNavDots();
+  updateNav();
+  // 초기 섹션 visible 감지
+  const obs=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{if(e.isIntersecting){
+      const i=parseInt(e.target.dataset.index);
+      if(i!==idx){idx=i;updateNav();}
+    }});
+  },{threshold:0.5});
+  document.querySelectorAll('.slide').forEach(s=>obs.observe(s));
 });
 
-function switchTab(m) {
-  S.mode = m;
-  document.querySelectorAll('.tab').forEach((t,i) =>
-    t.classList.toggle('active', (i===0 && m==='generate') || (i===1 && m==='stitch')));
-  document.getElementById('tab-generate').classList.toggle('hidden', m !== 'generate');
-  document.getElementById('tab-stitch').classList.toggle('hidden', m !== 'stitch');
-}
+function renderSlides(){
+  document.getElementById('slides').innerHTML=SECTIONS.map((s,i)=>{
+    let html=`<section class="slide" data-index="${i}"><div class="slide-inner">`;
+    html+=`<div class="slide-num">Section ${i+1} / ${SECTIONS.length}</div>`;
+    html+=`<h2>${esc(s.title)}</h2>`;
 
-// ── VOICES ──
-function loadVoices() {
-  const s = window.speechSynthesis;
-  const load = () => {
-    S.voices = s.getVoices().filter(v => v.lang.startsWith('ko'));
-    if (!S.voices.length) S.voices = s.getVoices();
-    S.voiceIdx = 0;
-    renderVoiceSelects();
-  };
-  load();
-  s.onvoiceschanged = load;
-}
-
-function renderVoiceSelects() {
-  const html = S.voices.map((v,i) =>
-    `<option value="${i}" ${i===S.voiceIdx?'selected':''}>${v.name} (${v.lang})</option>`).join('');
-  document.getElementById('genVoice').innerHTML = html;
-  document.getElementById('stitchVoice').innerHTML = html;
-
-  document.getElementById('genVoice').onchange = e => S.voiceIdx = +e.target.value;
-  document.getElementById('stitchVoice').onchange = e => S.voiceIdx = +e.target.value;
-}
-
-// ── LOG ──
-function log(msg, cls='') {
-  const t = new Date().toLocaleTimeString();
-  const el = document.getElementById('log');
-  el.innerHTML += `<div class="${cls}">[${t}] ${msg}</div>`;
-  el.scrollTop = el.scrollHeight;
-}
-function setProgress(pct, msg) {
-  document.getElementById('progressFill').style.width = pct+'%';
-  document.getElementById('progressText').textContent = msg || '';
-}
-
-// ── CANVAS RENDER ──
-function renderFrame(ctx, title, body, num, total) {
-  const W=720, H=1280;
-  const grad = ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,'#0f172a'); grad.addColorStop(0.5,'#1e1a3a'); grad.addColorStop(1,'#0f172a');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-
-  ctx.fillStyle = '#1e293b'; ctx.fillRect(50,H-50,W-100,3);
-  ctx.fillStyle = '#6366f1'; ctx.fillRect(50,H-50,(W-100)*num/total,3);
-
-  ctx.fillStyle = '#475569'; ctx.font='12px system-ui'; ctx.fillText('HELENA STUDIO',W-160,50);
-  ctx.fillStyle = '#6366f1'; ctx.font='14px system-ui'; ctx.fillText(`SECTION ${num}/${total}`,50,130);
-
-  ctx.fillStyle = '#f8fafc'; ctx.font='bold 36px system-ui';
-  const tl = wrap(ctx, title, W-100);
-  tl.forEach((l,i) => ctx.fillText(l, 50, 200+i*50));
-
-  ctx.fillStyle = '#cbd5e1'; ctx.font='22px system-ui';
-  const bl = wrap(ctx, body, W-100);
-  const sy = 200+tl.length*50+60;
-  bl.slice(0,10).forEach((l,i) => { if(sy+i*36<H-100) ctx.fillText(l, 50, sy+i*36); });
-
-  ctx.strokeStyle = '#6366f1'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(50,170+tl.length*50); ctx.lineTo(W-50,170+tl.length*50); ctx.stroke();
-}
-
-function wrap(ctx, text, maxW) {
-  const words = text.split(' '), lines = []; let line = '';
-  for (const w of words) {
-    const t = line ? line+' '+w : w;
-    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
-    else line = t;
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function speakText(text, voice) {
-  const truncated = text.length > LIMIT.maxSectionChars ? text.substring(0,LIMIT.maxSectionChars)+'...' : text;
-  return new Promise(resolve => {
-    if (!window.speechSynthesis) { setTimeout(resolve, truncated.length*60); return; }
-    const u = new SpeechSynthesisUtterance(truncated);
-    u.voice = voice; u.rate = 0.95; u.pitch = 1; u.volume = 1;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    window.speechSynthesis.speak(u);
-  });
-}
-
-// ── EXTRACT ──
-function extractContent(html) {
-  const d = document.createElement('div'); d.innerHTML = html;
-  d.querySelectorAll('script,style,nav,footer,code,pre').forEach(e => e.remove());
-  return d.textContent || '';
-}
-
-function splitSections(text) {
-  const clean = text.replace(/\s+/g,' ').trim();
-  const secs = [];
-  const hSplit = clean.split(/(?:^|\n)\s*#{1,3}\s+(.+?)(?:\n|$)/);
-  if (hSplit.length>1) {
-    for (let i=1; i<hSplit.length; i+=2) {
-      const body = (hSplit[i+1]||'').trim();
-      if (body.length>5) secs.push({title:hSplit[i].trim(), body:body.substring(0,LIMIT.maxBodyChars)});
-    }
-  }
-  if (!secs.length) {
-    const sents = clean.split(/[.。!?！？\n]+/).filter(s=>s.trim().length>5);
-    for (let i=0; i<Math.min(sents.length,15); i+=3) {
-      secs.push({title:`Part ${Math.floor(i/3)+1}`, body:sents.slice(i,i+3).join('. ').substring(0,LIMIT.maxBodyChars)});
-    }
-  }
-  return secs.slice(0, LIMIT.maxSections);
-}
-
-// ── GENERATE ONE ──
-async function generateOne() {
-  const btn = document.getElementById('genBtn');
-  btn.disabled = true; btn.textContent = '⏳ 생성 중...';
-  document.getElementById('previewSection').classList.add('hidden');
-  document.getElementById('progressSection').classList.remove('hidden');
-  document.getElementById('log').innerHTML = '';
-
-  try {
-    const url = document.getElementById('genUrl').value.trim();
-    if (!url) throw new Error('URL 입력');
-
-    setProgress(5, '가져오는 중...');
-    log(`🌐 ${url}`, 'i');
-    const html = await fetch(url).then(r=>r.text());
-    const content = extractContent(html);
-    const sections = splitSections(content);
-    log(`📝 ${content.length}자 → ${sections.length}섹션`, 'ok');
-
-    const voice = S.voices[S.voiceIdx] || null;
-    const canvas = document.createElement('canvas'); canvas.width=720; canvas.height=1280;
-    const ctx = canvas.getContext('2d');
-    const stream = canvas.captureStream(30);
-    const chunks = [];
-    const rec = new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9'});
-    rec.ondataavailable = e => chunks.push(e.data);
-    rec.start();
-
-    for (let i=0; i<sections.length; i++) {
-      const s = sections[i], pct = 10 + Math.floor(80*(i+1)/sections.length);
-      setProgress(pct, `[${i+1}/${sections.length}] ${s.title.substring(0,35)}`);
-      log(`🎬 [${i+1}/${sections.length}] ${s.title.substring(0,35)}`, 'i');
-      renderFrame(ctx, s.title, s.body, i+1, sections.length);
-      await speakText(`${s.title}. ${s.body}`, voice);
-    }
-
-    renderFrame(ctx, '완료', `Helena Studio · ${sections.length}섹션`, sections.length, sections.length);
-    await new Promise(r=>setTimeout(r,1500));
-    rec.stop();
-
-    await new Promise(resolve => { rec.onstop = () => {
-      S.resultBlob = new Blob(chunks,{type:'video/webm'});
-      S.resultUrl = URL.createObjectURL(S.resultBlob);
-      resolve();
-    }});
-
-    setProgress(100, '완료!');
-    log(`✅ ${(S.resultBlob.size/1024/1024).toFixed(1)}MB`, 'ok');
-    showPreview(sections.length);
-
-  } catch(e) { log(`❌ ${e.message}`, 'err'); setProgress(0, e.message); }
-
-  btn.disabled = false; btn.textContent = '영상 생성';
-}
-
-// ── STITCH: CLIP MANAGEMENT ──
-function addClip() {
-  if (S.clips.length >= LIMIT.maxClips) { log(`⚠️ 최대 ${LIMIT.maxClips}개 클립`, 'err'); return; }
-  const input = document.getElementById('stitchUrl');
-  const url = input.value.trim();
-  if (!url) return;
-  S.clips.push({url, title:url.split('/').pop()||url, status:'wait', blob:null, url_blob:null});
-  input.value = '';
-  renderClips();
-}
-
-function removeClip(i) { S.clips.splice(i,1); renderClips(); }
-function moveClip(i, dir) {
-  const j = i+dir;
-  if (j<0||j>=S.clips.length) return;
-  [S.clips[i], S.clips[j]] = [S.clips[j], S.clips[i]];
-  renderClips();
-}
-
-function renderClips() {
-  const list = document.getElementById('clipList');
-  const addBtn = document.getElementById('addClipBtn');
-  const maxEl = document.getElementById('maxClips');
-  if (maxEl) maxEl.textContent = LIMIT.maxClips;
-
-  if (!S.clips.length) {
-    list.innerHTML = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:.5rem;">URL을 추가하세요</div>';
-  } else {
-    list.innerHTML = S.clips.map((c,i) => `
-      <div class="clip-item">
-        <span class="clip-num">${i+1}</span>
-        <span class="clip-url">${c.url.substring(0,50)}</span>
-        <span class="clip-status ${c.status}">${c.status==='done'?'✅':'⏳'}</span>
-        <div class="clip-actions">
-          <button onclick="moveClip(${i},-1)" ${i===0?'disabled':''}>▲</button>
-          <button onclick="moveClip(${i},1)" ${i===S.clips.length-1?'disabled':''}>▼</button>
-          <button onclick="removeClip(${i})" style="color:#f87171">✕</button>
-        </div>
-      </div>`).join('');
-  }
-
-  if (S.clips.length >= LIMIT.maxClips) {
-    addBtn.disabled = true;
-    addBtn.textContent = '최대 '+LIMIT.maxClips+'개';
-    document.getElementById('stitchUrl').disabled = true;
-  } else {
-    addBtn.disabled = false;
-    addBtn.textContent = '+ 추가';
-    document.getElementById('stitchUrl').disabled = false;
-  }
-  updateStitchBtn();
-}
-
-function updateStitchBtn() {
-  const btn = document.getElementById('stitchBtn');
-  const cnt = document.getElementById('clipCount');
-  cnt.textContent = S.clips.length;
-  btn.disabled = S.clips.length < 2;
-}
-
-// ── STITCH ALL ──
-async function stitchAll() {
-  if (S.clips.length < 2) return;
-  const btn = document.getElementById('stitchBtn');
-  btn.disabled = true; btn.textContent = '⏳ 이어붙이는 중...';
-  document.getElementById('previewSection').classList.add('hidden');
-  document.getElementById('progressSection').classList.remove('hidden');
-  document.getElementById('log').innerHTML = '';
-
-  try {
-    const voice = S.voices[S.voiceIdx] || null;
-    const canvas = document.createElement('canvas'); canvas.width=720; canvas.height=1280;
-    const ctx = canvas.getContext('2d');
-    const stream = canvas.captureStream(30);
-    const chunks = [];
-    const rec = new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9'});
-    rec.ondataavailable = e => chunks.push(e.data);
-    rec.start();
-
-    let totalSections = 0;
-    // First pass: get section counts for progress
-    const allSections = [];
-    for (const clip of S.clips) {
-      const html = await fetch(clip.url).then(r=>r.text());
-      const content = extractContent(html);
-      const secs = splitSections(content);
-      allSections.push({clip, secs});
-      totalSections += secs.length;
-    }
-
-    let done = 0;
-    for (const {clip, secs} of allSections) {
-      // Title card for this clip
-      renderFrame(ctx, clip.url.split('/').pop()||'Clip', `출처: ${clip.url}`, done+1, totalSections);
-      await new Promise(r=>setTimeout(r,800));
-
-      for (const s of secs) {
-        done++;
-        const pct = Math.floor(90*done/totalSections);
-        setProgress(pct, `[${done}/${totalSections}] ${s.title.substring(0,30)}`);
-        log(`🎬 [${done}/${totalSections}] ${s.title.substring(0,30)}`, 'i');
-        renderFrame(ctx, s.title, s.body, done, totalSections);
-        await speakText(`${s.title}. ${s.body}`, voice);
+    // 블록 렌더링
+    let accordionIdx=0;
+    for(const b of s.blocks){
+      if(b.type==='p') html+=`<div class="glass"><p>${esc(b.content)}</p></div>`;
+      else if(b.type==='list'){
+        html+=`<ul class="glass-list">`;
+        b.content.forEach(l=>html+=`<li>${esc(l)}</li>`);
+        html+=`</ul>`;
+      }
+      else if(b.type==='mermaid'){
+        html+=`<div class="mermaid-glass"><div class="mermaid" id="mm${i}">${esc(b.content)}</div></div>`;
+      }
+      else if(b.type==='table') html+=renderTable(b.content);
+      else if(b.type==='code'){
+        html+=`<div class="accordion" id="acc${i}_${accordionIdx}">`;
+        html+=`<div class="accordion-header" onclick="toggleAccordion('acc${i}_${accordionIdx}')">`;
+        html+=`<span>💻 코드 보기</span><span class="accordion-arrow">▼</span></div>`;
+        html+=`<div class="accordion-body"><div class="code-glass"><pre>${esc(b.content)}</pre></div></div></div>`;
+        accordionIdx++;
       }
     }
 
-    renderFrame(ctx, '완료', `Helena Studio · ${S.clips.length}클립·${totalSections}섹션 이어붙이기`, totalSections, totalSections);
-    await new Promise(r=>setTimeout(r,2000));
-    rec.stop();
+    // 인포그래픽 자동 감지: 숫자 패턴
+    const nums=extractNumbers(s);
+    if(nums.length>=2){
+      html+=`<div class="info-grid">`;
+      nums.forEach(n=>html+=`<div class="info-tile"><div class="val">${n.val}</div><div class="lbl">${n.lbl}</div></div>`);
+      html+=`</div>`;
+    }
 
-    await new Promise(resolve => { rec.onstop = () => {
-      S.resultBlob = new Blob(chunks,{type:'video/webm'});
-      S.resultUrl = URL.createObjectURL(S.resultBlob);
-      resolve();
-    }});
+    html+=`</div></section>`;
+    return html;
+  }).join('');
 
-    setProgress(100, '이어붙이기 완료!');
-    log(`✅ ${S.clips.length}클립 → ${(S.resultBlob.size/1024/1024).toFixed(1)}MB`, 'ok');
-    showPreview(totalSections);
-
-  } catch(e) { log(`❌ ${e.message}`, 'err'); setProgress(0, e.message); }
-
-  btn.disabled = false; btn.textContent = `영상 이어붙이기 (${S.clips.length}개 클립)`;
+  // Mermaid
+  setTimeout(async()=>{
+    for(const el of document.querySelectorAll('.mermaid')){
+      try{const{svg}=await mermaid.render('mm_'+Math.random().toString(36).slice(2),el.textContent);el.innerHTML=svg}
+      catch(e){el.innerHTML='<p style=color:var(--red)>Diagram error</p>'}
+    }
+  },200);
 }
 
-// ── SHARED ──
-function showPreview(n) {
-  document.getElementById('previewVideo').src = S.resultUrl;
-  document.getElementById('previewSection').classList.remove('hidden');
-  document.getElementById('previewInfo').textContent =
-    `${n}섹션 · ${(S.resultBlob.size/1024/1024).toFixed(1)}MB`;
+function extractNumbers(s){
+  const nums=[];
+  const text=s.title+' '+s.blocks.filter(b=>b.type==='p').map(b=>b.content).join(' ');
+  // "28개" "27🔒" 같은 패턴
+  const m1=text.match(/(\d+)\s*(개|종|레포|🔒|🌐)/g);
+  if(m1) m1.forEach(m=>{const v=m.match(/(\d+)/);if(v)nums.push({val:v[1],lbl:m.replace(v[1],'').trim()});});
+  return nums.slice(0,6);
 }
 
-function downloadVideo() {
-  if (!S.resultBlob) return;
-  const a = document.createElement('a');
-  a.href = S.resultUrl; a.download = 'helena-studio.webm'; a.click();
+function renderTable(text){
+  const lines=text.trim().split('\n');
+  if(lines.length<2)return'';
+  const parseRow=l=>l.split('|').filter(c=>c.trim()).map(c=>c.trim());
+  const header=parseRow(lines[0]);
+  const rows=lines.slice(2).map(parseRow);
+  let h='<div class="table-glass"><table><thead><tr>';
+  header.forEach(c=>h+=`<th>${esc(c)}</th>`);
+  h+='</tr></thead><tbody>';
+  rows.forEach(r=>{h+='<tr>';r.forEach(c=>h+=`<td>${esc(c)}</td>`);h+='</tr>'});
+  h+='</tbody></table></div>';
+  return h;
 }
+
+// 아코디언
+function toggleAccordion(id){document.getElementById(id).classList.toggle('open')}
+
+// 내비
+function renderNavDots(){
+  document.getElementById('navDots').innerHTML=SECTIONS.map((_,i)=>
+    `<div class="nav-dot" id="dot${i}" onclick="goTo(${i})" title="${SECTIONS[i].title.substring(0,30)}"></div>`).join('');
+}
+function updateNav(){
+  document.querySelectorAll('.nav-dot').forEach((d,i)=>{d.classList.toggle('active',i===idx);d.classList.toggle('done',i<idx)});
+  document.getElementById('progressBar').style.width=((idx+1)/SECTIONS.length*100)+'%';
+}
+function goTo(i){
+  document.querySelectorAll('.slide')[i]?.scrollIntoView({behavior:'smooth'});
+  idx=i;updateNav();
+}
+
+// TTS
+function speak(text){
+  return new Promise(resolve=>{
+    if(!window.speechSynthesis){setTimeout(resolve,text.length*55);return}
+    const u=new SpeechSynthesisUtterance(text.substring(0,2000));
+    const voices=speechSynthesis.getVoices();
+    const kr=voices.filter(v=>v.lang.startsWith('ko'));
+    if(kr.length)u.voice=kr[0];
+    u.rate=0.92;u.pitch=1;
+    u.onend=()=>resolve();u.onerror=()=>resolve();
+    speechSynthesis.speak(u);
+  });
+}
+async function readSection(i){
+  const s=SECTIONS[i];
+  let text=s.title+'. ';
+  for(const b of s.blocks){
+    if(b.type==='p')text+=b.content+'. ';
+    else if(b.type==='list')text+=b.content.join('. ')+'. ';
+  }
+  document.getElementById('ttsBadge').classList.add('on');
+  goTo(i);
+  await speak(text);
+  document.getElementById('ttsBadge').classList.remove('on');
+}
+
+// Play All
+async function togglePlay(){
+  if(playing){stopPlay();return}
+  playing=true;
+  const btn=document.getElementById('playBtn');
+  btn.textContent='⏸ Stop';btn.classList.add('playing');
+  for(let i=idx;i<SECTIONS.length;i++){
+    if(!playing)break;
+    await readSection(i);
+    if(i<SECTIONS.length-1&&playing)await new Promise(r=>setTimeout(r,600));
+  }
+  if(playing)stopPlay();
+}
+function stopPlay(){
+  playing=false;window.speechSynthesis?.cancel();
+  const btn=document.getElementById('playBtn');
+  btn.textContent='▶ Play All';btn.classList.remove('playing');
+  document.getElementById('ttsBadge').classList.remove('on');
+}
+
+// 영상 익스포트
+async function exportVideo(){
+  const btn=event.target;btn.textContent='⏳';btn.disabled=true;
+  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
+  const ctx=canvas.getContext('2d');
+  const stream=canvas.captureStream(30);
+  const chunks=[];const rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9'});
+  rec.ondataavailable=e=>chunks.push(e.data);rec.start();
+
+  for(let i=0;i<SECTIONS.length;i++){
+    const s=SECTIONS[i];
+    const grad=ctx.createLinearGradient(0,0,0,1280);
+    grad.addColorStop(0,'#050510');grad.addColorStop(0.5,'#0a0a20');grad.addColorStop(1,'#050510');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,720,1280);
+
+    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.beginPath();
+    ctx.roundRect(30,30,660,1220,20);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(30,30,660,1220,20);ctx.stroke();
+
+    ctx.fillStyle='#818cf8';ctx.font='11px system-ui';ctx.fillText(f'SECTION ${i+1}/${SECTIONS.length}',60,80);
+
+    ctx.fillStyle='#e8e8f0';ctx.font='bold 30px system-ui';
+    const tl=wrapText(ctx,s.title,600);
+    tl.forEach((l,j)=>ctx.fillText(l,60,140+j*42));
+
+    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='19px system-ui';
+    let y=140+tl.length*42+30;
+    for(const b of s.blocks){
+      let t='';if(b.type==='p')t=b.content;else if(b.type==='list')t=b.content.join('. ');
+      if(t){const bl=wrapText(ctx,t.substring(0,250),600);bl.slice(0,6).forEach(l=>{if(y<1180){ctx.fillText(l,60,y);y+=28}});}
+    }
+
+    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(30,1230,660,3);
+    ctx.fillStyle='#818cf8';ctx.fillRect(30,1230,660*(i+1)/SECTIONS.length,3);
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px system-ui';ctx.fillText(f'${i+1}/${SECTIONS.length}',650,1255);
+
+    await readSection(i);
+    if(i<SECTIONS.length-1)await new Promise(r=>setTimeout(r,300));
+  }
+  ctx.fillStyle='#050510';ctx.fillRect(0,0,720,1280);
+  ctx.fillStyle='#e8e8f0';ctx.font='bold 28px system-ui';ctx.fillText('✓ 완료',60,600);
+  await new Promise(r=>setTimeout(r,1500));
+  rec.stop();await new Promise(r=>rec.onstop=r);
+
+  const blob=new Blob(chunks,{type:'video/webm'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='helena-studio.webm';a.click();
+  btn.textContent='📥 저장';btn.disabled=false;
+}
+
+function wrapText(ctx,text,maxW){
+  const words=text.split(' '),lines=[];let line='';
+  for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t}
+  if(line)lines.push(line);return lines;
+}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 </script>
-</body>
-</html>
+</body></html>

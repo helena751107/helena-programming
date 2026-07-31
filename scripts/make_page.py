@@ -1,137 +1,81 @@
 #!/usr/bin/env python3
 """
-make_page.py — 마크다운 백서 → 인터랙티브 HTML + 영상 익스포트
---------------------------------------------------------------------------------
-입력:  .md 파일 (백서, 로그, 문서)
-출력:  단일 .html 파일 — 클릭 네비게이션 + TTS + 다이어그램 + 인포그래픽 + 영상저장
-
-실행:  python3 scripts/make_page.py 문서.md
-열기:  생성된 .html을 브라우저에서 열고 "▶ Play All" 누르면 TTS 읽으면서
-       자동 페이지 넘김 → 종료 시 WebM 자동 다운로드
-
-브라우저만 있으면 된다. 서버 불필요.
+make_page.py — 마크다운 백서 → 프리미엄 인터랙티브 HTML + 영상 익스포트
+========================================================================
+입력:  .md 파일
+출력:  단일 .html — 풀스크린·아코디언·글래스모피즘·애니메이션·Mermaid·영상저장
 """
 
 import os, sys, re, json, argparse
 from pathlib import Path
 
 
-# ── 마크다운 파싱 ──
 def parse_markdown_full(text: str) -> list:
-    """
-    마크다운 → [ {type, content, meta} ] 구조화
-    type: h1,h2,h3, p, table, code_mermaid, code_other, list, hr
-    """
     blocks = []
     lines = text.split('\n')
     i = 0
-
     while i < len(lines):
         line = lines[i]
-
-        # 헤딩
         m = re.match(r'^(#{1,3})\s+(.+)', line)
         if m:
-            level = len(m.group(1))
-            blocks.append({"type": f"h{level}", "content": m.group(2).strip()})
-            i += 1
-            continue
-
-        # 코드 블록
+            blocks.append({"type": f"h{len(m.group(1))}", "content": m.group(2).strip()})
+            i += 1; continue
         if line.strip().startswith('```'):
             lang = line.strip()[3:].strip()
-            code_lines = []
-            i += 1
+            code_lines = []; i += 1
             while i < len(lines) and not lines[i].strip().startswith('```'):
-                code_lines.append(lines[i])
-                i += 1
-            i += 1  # 닫는 ```
-            code = '\n'.join(code_lines)
-            if lang == 'mermaid':
-                blocks.append({"type": "mermaid", "content": code})
-            else:
-                blocks.append({"type": "code", "content": code, "lang": lang})
-            continue
-
-        # 표
-        if line.strip().startswith('|') and i+1 < len(lines) and re.match(r'^\|[\s\-:|]+\|$', lines[i+1].strip()):
-            table_lines = [line]
+                code_lines.append(lines[i]); i += 1
             i += 1
-            # 헤더 구분선
+            code = '\n'.join(code_lines)
+            blocks.append({"type": "mermaid" if lang == 'mermaid' else "code", "content": code, "lang": lang})
+            continue
+        if line.strip().startswith('|') and i+1 < len(lines) and re.match(r'^\|[\s\-:|]+\|$', lines[i+1].strip()):
+            table_lines = [line]; i += 1
             if i < len(lines): table_lines.append(lines[i]); i += 1
-            while i < len(lines) and lines[i].strip().startswith('|'):
-                table_lines.append(lines[i]); i += 1
+            while i < len(lines) and lines[i].strip().startswith('|'): table_lines.append(lines[i]); i += 1
             blocks.append({"type": "table", "content": '\n'.join(table_lines)})
             continue
-
-        # 리스트
         if re.match(r'^\s*[\-\*]\s+', line):
-            list_items = []
+            items = []
             while i < len(lines) and re.match(r'^\s*[\-\*]\s+', lines[i]):
                 item = re.sub(r'^\s*[\-\*]\s+', '', lines[i]).strip()
-                # 인라인 코드/볼드 제거
                 item = re.sub(r'`([^`]+)`', r'\1', item)
                 item = re.sub(r'\*\*([^*]+)\*\*', r'\1', item)
-                if item: list_items.append(item)
+                if item: items.append(item)
                 i += 1
-            blocks.append({"type": "list", "content": list_items})
+            blocks.append({"type": "list", "content": items})
             continue
-
-        # 빈 줄 / 구분선
-        if not line.strip() or line.strip().startswith('---'):
-            i += 1
-            continue
-
-        # 일반 텍스트 (문단 누적)
+        if not line.strip() or line.strip().startswith('---'): i += 1; continue
         para_lines = []
-        while i < len(lines) and lines[i].strip() and \
-              not lines[i].strip().startswith('#') and \
-              not lines[i].strip().startswith('```') and \
-              not lines[i].strip().startswith('|') and \
-              not re.match(r'^\s*[\-\*]\s+', lines[i]):
+        while i < len(lines) and lines[i].strip() and not lines[i].strip().startswith('#') and not lines[i].strip().startswith('```') and not lines[i].strip().startswith('|') and not re.match(r'^\s*[\-\*]\s+', lines[i]):
             clean = lines[i].strip()
             clean = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', clean)
             clean = re.sub(r'[*_`]', '', clean)
             if clean: para_lines.append(clean)
             i += 1
-        if para_lines:
-            blocks.append({"type": "p", "content": ' '.join(para_lines)})
-        else:
-            i += 1
-
+        if para_lines: blocks.append({"type": "p", "content": ' '.join(para_lines)})
+        else: i += 1
     return blocks
 
 
-# ── 섹션 그룹화 ──
 def group_sections(blocks: list) -> list:
-    """h2/h3 기준으로 블록들을 섹션으로 묶음"""
-    sections = []
-    current = {"title": "", "blocks": []}
-
+    sections = []; current = {"title": "", "blocks": []}
     for b in blocks:
-        if b["type"] in ("h1",):
-            if current["title"] or current["blocks"]:
-                sections.append(current)
+        if b["type"] == "h1":
+            if current["title"] or current["blocks"]: sections.append(current)
             current = {"title": b["content"], "blocks": []}
         elif b["type"] in ("h2", "h3"):
-            if current["title"] or current["blocks"]:
-                sections.append(current)
+            if current["title"] or current["blocks"]: sections.append(current)
             current = {"title": b["content"], "blocks": []}
         else:
             current["blocks"].append(b)
-
-    if current["title"] or current["blocks"]:
-        sections.append(current)
-
-    return sections[:10]
+    if current["title"] or current["blocks"]: sections.append(current)
+    return sections[:12]
 
 
-# ── HTML 생성 ──
 def generate_html(sections: list, title: str) -> str:
-    """섹션 → 완전한 인터랙티브 HTML 페이지"""
     sections_js = json.dumps([
-        {"title": s["title"], "blocks": s["blocks"]}
-        for s in sections
+        {"title": s["title"], "blocks": s["blocks"]} for s in sections
     ], ensure_ascii=False)
 
     return f'''<!DOCTYPE html>
@@ -139,341 +83,394 @@ def generate_html(sections: list, title: str) -> str:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>{title} — Helena Studio</title>
+<title>{title}</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
-:root{{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#64748b;--accent:#6366f1;--accent2:#818cf8;--gold:#f59e0b;--green:#4ade80}}
+:root{{
+  --bg:#050510; --bg2:#0a0a20; --surface:rgba(255,255,255,0.03);
+  --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.1);
+  --text:#e8e8f0; --text2:rgba(255,255,255,0.65); --text3:rgba(255,255,255,0.35);
+  --accent:#818cf8; --accent2:#6366f1; --accent-glow:rgba(99,102,241,0.3);
+  --gold:#f59e0b; --gold-glow:rgba(245,158,11,0.2);
+  --green:#34d399; --red:#f87171; --pink:#f472b6; --cyan:#22d3ee;
+  --font:'Inter','Noto Sans KR',system-ui,sans-serif;
+  --transition:0.5s cubic-bezier(0.16,1,0.3,1);
+}}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}}
-/* 헤더 */
-.topbar{{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}}
-.topbar h2{{font-size:1rem;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
-.btn{{padding:.5rem 1rem;border:none;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:700;transition:all .15s}}
-.btn:active{{transform:scale(.96)}}
-.btn-primary{{background:var(--accent);color:#fff}}
-.btn-primary.playing{{background:#dc2626}}
-.btn-outline{{background:transparent;border:1px solid var(--border);color:var(--text)}}
-.btn-sm{{padding:.35rem .7rem;font-size:.7rem}}
-.btn-icon{{background:none;border:none;color:var(--text);cursor:pointer;font-size:1.2rem;padding:.25rem}}
+html{{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;height:100vh}}
+body{{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}}
 
-/* 인디케이터 */
-.dots{{display:flex;gap:4px;align-items:center}}
-.dot{{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all .2s;cursor:pointer}}
-.dot.active{{background:var(--accent);transform:scale(1.3)}}
-.dot.done{{background:var(--green)}}
+/* 배경 파티클 */
+.bg-particles{{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}}
+.bg-particles .orb{{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.08;animation:float 20s infinite ease-in-out}}
+.bg-particles .orb:nth-child(1){{width:600px;height:600px;background:var(--accent);top:-200px;left:-100px;animation-delay:0s}}
+.bg-particles .orb:nth-child(2){{width:400px;height:400px;background:var(--pink);bottom:-100px;right:-100px;animation-delay:-7s}}
+.bg-particles .orb:nth-child(3){{width:500px;height:500px;background:var(--cyan);top:50%;left:50%;animation-delay:-14s}}
+@keyframes float{{0%,100%{{transform:translate(0,0) scale(1)}}25%{{transform:translate(100px,-50px) scale(1.1)}}50%{{transform:translate(-50px,100px) scale(0.9)}}75%{{transform:translate(-100px,-100px) scale(1.05)}}}}
 
-/* 메인 */
-.main{{flex:1;padding:1.5rem;max-width:800px;margin:0 auto;width:100%}}
-.section{{display:none;animation:fadeIn .3s}}
-.section.active{{display:block}}
-@keyframes fadeIn{{from{{opacity:0;transform:translateY(10px)}}to{{opacity:1;transform:translateY(0)}}}}
+/* 내비게이션 바 */
+.navbar{{position:fixed;top:0;left:0;right:0;z-index:100;padding:1rem 1.5rem;
+  background:rgba(5,5,16,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}}
+.navbar .logo{{font-weight:800;font-size:1rem;letter-spacing:-0.02em;flex:1}}
+.navbar .logo span{{color:var(--accent)}}
+.nav-dots{{display:flex;gap:6px}}
+.nav-dot{{width:10px;height:10px;border-radius:50%;background:var(--border2);cursor:pointer;transition:all 0.3s;position:relative}}
+.nav-dot.active{{background:var(--accent);box-shadow:0 0 12px var(--accent-glow);transform:scale(1.2)}}
+.nav-dot.done{{background:var(--green)}}
+.nav-btn{{padding:.5rem 1rem;border:1px solid var(--border2);border-radius:8px;
+  background:rgba(255,255,255,0.03);color:var(--text);cursor:pointer;
+  font-size:.8rem;font-weight:500;transition:all 0.2s;font-family:var(--font)}}
+.nav-btn:hover{{border-color:var(--accent);background:rgba(99,102,241,0.1)}}
+.nav-btn.primary{{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}}
+.nav-btn.primary:hover{{background:var(--accent);box-shadow:0 0 20px var(--accent-glow)}}
+.nav-btn.primary.playing{{background:#dc2626;border-color:#dc2626}}
 
-/* 카드 */
-.card{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1rem}}
-.card h3{{font-size:1.3rem;margin-bottom:1rem;color:#f8fafc}}
-.card p{{font-size:1rem;line-height:1.7;color:var(--text);margin-bottom:.75rem}}
-.card code{{background:#1e1e2e;padding:.15rem .4rem;border-radius:4px;font-size:.85rem;color:#f472b6}}
+/* 섹션 */
+.slide{{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:5rem 2rem 3rem;position:relative;z-index:1;
+  scroll-snap-align:start;scroll-snap-stop:always}}
+.slide-inner{{width:100%;max-width:900px}}
+.slide-num{{font-size:.75rem;font-weight:600;letter-spacing:0.15em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:1rem}}
+.slide h2{{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.2;
+  letter-spacing:-0.03em;margin-bottom:2rem;background:linear-gradient(135deg,var(--text) 0%,var(--text2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+.slide h2 .hl{{color:var(--accent);-webkit-text-fill-color:var(--accent)}}
 
-/* 인포그래픽 카드 */
-.info-card{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin:1rem 0}}
-.info-item{{background:linear-gradient(135deg,#1e1a3a,#1e293b);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center}}
-.info-item .num{{font-size:2rem;font-weight:800;color:var(--accent2)}}
-.info-item .label{{font-size:.75rem;color:var(--muted);margin-top:.25rem}}
+/* 글래스 카드 */
+.glass{{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:2rem;margin-bottom:1rem;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:all 0.3s}}
+.glass:hover{{border-color:var(--border2);background:rgba(255,255,255,0.04)}}
+.glass p{{font-size:1.05rem;line-height:1.75;color:var(--text2);margin-bottom:.75rem}}
+.glass p:last-child{{margin-bottom:0}}
+
+/* 아코디언 */
+.accordion{{margin-bottom:.5rem;border-radius:14px;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);transition:all 0.3s}}
+.accordion-header{{padding:1.2rem 1.5rem;cursor:pointer;display:flex;
+  align-items:center;justify-content:space-between;user-select:none;
+  font-weight:600;font-size:1rem;transition:all 0.2s}}
+.accordion-header:hover{{background:rgba(255,255,255,0.02)}}
+.accordion-arrow{{font-size:.7rem;transition:transform 0.3s;color:var(--text3)}}
+.accordion.open .accordion-arrow{{transform:rotate(180deg);color:var(--accent)}}
+.accordion-body{{max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}}
+.accordion.open .accordion-body{{max-height:2000px;padding:0 1.5rem 1.5rem}}
+.accordion-body p{{font-size:.95rem;line-height:1.7;color:var(--text2)}}
+
+/* 인포그래픽 그리드 */
+.info-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:1.5rem 0}}
+.info-tile{{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.02));
+  border:1px solid var(--border);border-radius:16px;padding:1.5rem;text-align:center;
+  transition:all 0.3s;position:relative;overflow:hidden}}
+.info-tile::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity 0.3s}}
+.info-tile:hover{{border-color:var(--accent);transform:translateY(-2px)}}
+.info-tile:hover::before{{opacity:1}}
+.info-tile .val{{font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,var(--accent),#c084fc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+.info-tile .lbl{{font-size:.75rem;color:var(--text3);margin-top:.4rem;font-weight:500}}
+
+/* 하이라이트 카드 */
+.hl-card{{background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.01));
+  border:1px solid rgba(245,158,11,0.15);border-radius:16px;padding:1.5rem;margin:1rem 0}}
+.hl-card .icon{{font-size:1.5rem;margin-bottom:.5rem}}
+.hl-card p{{font-size:.95rem;line-height:1.7;color:var(--text2)}}
+.hl-card strong{{color:var(--gold)}}
 
 /* 테이블 */
-.table-wrap{{overflow-x:auto;margin:1rem 0;border-radius:8px;border:1px solid var(--border)}}
-table{{width:100%;border-collapse:collapse;font-size:.85rem}}
-th{{background:var(--accent);color:#fff;padding:.6rem;text-align:left;font-weight:600}}
-td{{padding:.5rem .6rem;border-bottom:1px solid var(--border)}}
-tr:last-child td{{border-bottom:none}}
-tr:nth-child(even){{background:rgba(255,255,255,.02)}}
+.table-glass{{overflow-x:auto;margin:1rem 0;border-radius:14px;border:1px solid var(--border)}}
+.table-glass table{{width:100%;border-collapse:collapse;font-size:.9rem}}
+.table-glass th{{background:rgba(99,102,241,0.15);color:var(--accent);padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em}}
+.table-glass td{{padding:.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text2)}}
+.table-glass tr:last-child td{{border-bottom:none}}
+.table-glass tr:hover td{{background:rgba(255,255,255,0.02)}}
 
 /* 리스트 */
-.list-item{{padding:.6rem 1rem;border-left:2px solid var(--accent);margin:.4rem 0;background:rgba(99,102,241,.05);border-radius:0 6px 6px 0;font-size:.9rem}}
+.glass-list{{list-style:none}}
+.glass-list li{{padding:.8rem 1rem;margin:.3rem 0;border-left:2px solid var(--accent);
+  background:rgba(99,102,241,0.03);border-radius:0 8px 8px 0;font-size:.9rem;color:var(--text2);transition:all 0.2s}}
+.glass-list li:hover{{border-left-width:4px;background:rgba(99,102,241,0.06)}}
 
 /* 다이어그램 */
-.mermaid-wrap{{background:#fff;border-radius:8px;padding:1rem;margin:1rem 0;overflow-x:auto}}
+.mermaid-glass{{background:rgba(255,255,255,0.98);border-radius:14px;padding:1.5rem;margin:1rem 0;overflow-x:auto}}
 
 /* 코드 */
-.code-block{{background:#1e1e2e;border-radius:8px;padding:1rem;overflow-x:auto;font-size:.8rem;font-family:monospace;color:#a6adc8;margin:1rem 0}}
+.code-glass{{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:1.2rem;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.8rem;color:#a6adc8;line-height:1.6;margin:1rem 0}}
 
-/* TTS 표시 */
-.tts-indicator{{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:.5rem 1.5rem;border-radius:20px;font-size:.8rem;display:none;z-index:200;animation:pulse 1s infinite}}
-.tts-indicator.show{{display:block}}
-@keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.7}}}}
+/* TTS 인디케이터 */
+.tts-badge{{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:200;
+  background:var(--accent2);color:#fff;padding:.6rem 1.8rem;border-radius:30px;
+  font-size:.85rem;font-weight:600;display:none;box-shadow:0 8px 30px var(--accent-glow);
+  animation:pulse 1.5s infinite;letter-spacing:-0.01em}}
+.tts-badge.on{{display:block}}
+@keyframes pulse{{0%,100%{{opacity:1;transform:translateX(-50%) scale(1)}}50%{{opacity:.85;transform:translateX(-50%) scale(1.03)}}}}
 
 /* 진행바 */
-.progress{{height:3px;background:var(--border);position:sticky;top:52px;z-index:99}}
-.progress-fill{{height:100%;background:var(--accent);transition:width .3s;width:0%}}
+.progress-fixed{{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc);z-index:200;transition:width 0.5s ease;border-radius:0 2px 2px 0}}
 
-/* 내비 */
-.nav-row{{display:flex;gap:.5rem;justify-content:center;padding:1rem}}
+/* 반응형 */
+@media(max-width:768px){{
+  .slide{{padding:4rem 1rem 2rem}}
+  .glass{{padding:1.25rem}}
+  .info-grid{{grid-template-columns:repeat(2,1fr)}}
+  .navbar{{padding:.75rem 1rem;gap:.5rem}}
+  .nav-btn{{padding:.4rem .7rem;font-size:.7rem}}
+}}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <span style="font-size:1.2rem">🎬</span>
-  <h2>{title}</h2>
-  <div class="dots" id="dots"></div>
-  <button class="btn btn-primary" id="playBtn" onclick="togglePlay()">▶ Play All</button>
+<div class="bg-particles">
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
 </div>
-<div class="progress"><div class="progress-fill" id="progressFill"></div></div>
-<div class="main" id="main"></div>
-<div class="tts-indicator" id="ttsIndicator">🔊 TTS 읽는 중...</div>
-<div class="nav-row">
-  <button class="btn btn-outline btn-sm" onclick="prev()">◀ 이전</button>
-  <span style="font-size:.8rem;color:var(--muted);align-self:center" id="pageNum">1/1</span>
-  <button class="btn btn-outline btn-sm" id="nextBtn" onclick="next()">다음 ▶</button>
-  <button class="btn btn-outline btn-sm" onclick="exportVideo()" title="전체 재생 후 영상 저장">📥 영상저장</button>
+<div class="progress-fixed" id="progressBar" style="width:0%"></div>
+<div class="navbar">
+  <div class="logo">🎬 <span>Helena</span> Studio</div>
+  <div class="nav-dots" id="navDots"></div>
+  <button class="nav-btn primary" id="playBtn" onclick="togglePlay()">▶ Play All</button>
+  <button class="nav-btn" onclick="exportVideo()">📥 저장</button>
 </div>
+<div class="tts-badge" id="ttsBadge">🔊 읽는 중...</div>
+
+<div id="slides"></div>
 
 <script>
-// ── DATA ──
 const SECTIONS = {sections_js};
-let idx = 0, playing = false, playTimer = null;
+let idx=0,playing=false;
 
-// ── INIT ──
-mermaid.initialize({{startOnLoad:false,theme:'default'}});
+mermaid.initialize({{startOnLoad:false,theme:'base',themeVariables:{{primaryColor:'#818cf8',primaryTextColor:'#1e1b4b',primaryBorderColor:'#6366f1',lineColor:'#6366f1',secondaryColor:'#f0abfc',tertiaryColor:'#e0e7ff'}}}});
+
 document.addEventListener('DOMContentLoaded',()=>{{
-  renderAll();
-  renderDots();
-  showSection(0);
+  renderSlides();
+  renderNavDots();
+  updateNav();
+  // 초기 섹션 visible 감지
+  const obs=new IntersectionObserver((entries)=>{{
+    entries.forEach(e=>{{if(e.isIntersecting){{
+      const i=parseInt(e.target.dataset.index);
+      if(i!==idx){{idx=i;updateNav();}}
+    }}}});
+  }},{{threshold:0.5}});
+  document.querySelectorAll('.slide').forEach(s=>obs.observe(s));
 }});
 
-// ── RENDER ──
-function renderAll() {{
-  const main = document.getElementById('main');
-  main.innerHTML = SECTIONS.map((s,i) => {{
-    let html = `<div class="section" id="sec${{i}}"><div class="card"><h3>${{esc(s.title)}}</h3>`;
-    for (const b of s.blocks) {{
-      if (b.type==='p') html += `<p>${{esc(b.content)}}</p>`;
-      else if (b.type==='mermaid') html += `<div class="mermaid-wrap"><div class="mermaid" id="mm${{i}}">${{esc(b.content)}}</div></div>`;
-      else if (b.type==='code') html += `<div class="code-block"><pre>${{esc(b.content)}}</pre></div>`;
-      else if (b.type==='table') html += renderTable(b.content);
-      else if (b.type==='list') html += b.content.map(l=>`<div class="list-item">${{esc(l)}}</div>`).join('');
-    }}
-    html += '</div></div>';
-    return html;
-  }}).join('');
-  // Mermaid 렌더링
-  setTimeout(async ()=>{{
-    const els = document.querySelectorAll('.mermaid');
-    for (const el of els) {{
-      try {{
-        const id = 'mm_'+Math.random().toString(36).slice(2);
-        el.id = id;
-        const {{svg}} = await mermaid.render(id+'_svg', el.textContent);
-        el.innerHTML = svg;
-      }} catch(e) {{ el.innerHTML = '<p style=color:red>Diagram error</p>'; }}
-    }}
-  }},100);
-}}
+function renderSlides(){{
+  document.getElementById('slides').innerHTML=SECTIONS.map((s,i)=>{{
+    let html=`<section class="slide" data-index="${{i}}"><div class="slide-inner">`;
+    html+=`<div class="slide-num">Section ${{i+1}} / ${{SECTIONS.length}}</div>`;
+    html+=`<h2>${{esc(s.title)}}</h2>`;
 
-function renderTable(text) {{
-  const lines = text.trim().split('\\n');
-  if (lines.length<2) return '';
-  const parseRow = l => l.split('|').filter(c=>c.trim()).map(c=>c.trim());
-  const header = parseRow(lines[0]);
-  const alignRow = lines[1]; // 구분선 건너뛰기
-  const rows = lines.slice(2).map(parseRow);
-  let html = '<div class="table-wrap"><table><thead><tr>';
-  header.forEach(h=>html+=`<th>${{esc(h)}}</th>`);
-  html+='</tr></thead><tbody>';
-  rows.forEach(r=>{{html+='<tr>'; r.forEach(c=>html+=`<td>${{esc(c)}}</td>`); html+='</tr>'}});
-  html+='</tbody></table></div>';
-  return html;
-}}
-
-// ── NAV ──
-function showSection(i) {{
-  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  const el = document.getElementById('sec'+i);
-  if (el) el.classList.add('active');
-  idx = i;
-  updateDots();
-  document.getElementById('pageNum').textContent = (i+1)+'/'+SECTIONS.length;
-  document.getElementById('progressFill').style.width = ((i+1)/SECTIONS.length*100)+'%';
-  document.getElementById('nextBtn').style.display = i>=SECTIONS.length-1 ? 'none' : '';
-}}
-
-function next() {{ if (idx<SECTIONS.length-1) showSection(idx+1); }}
-function prev() {{ if (idx>0) showSection(idx-1); }}
-
-// ── DOTS ──
-function renderDots() {{
-  document.getElementById('dots').innerHTML = SECTIONS.map((_,i) =>
-    `<div class="dot" onclick="showSection(${{i}})" id="dot${{i}}"></div>`).join('');
-}}
-function updateDots() {{
-  document.querySelectorAll('.dot').forEach((d,i)=>{{
-    d.classList.toggle('active', i===idx);
-    d.classList.toggle('done', i<idx);
-  }});
-}}
-
-// ── TTS ──
-function speak(text) {{
-  return new Promise(resolve => {{
-    if (!window.speechSynthesis) {{ setTimeout(resolve,text.length*60); return; }}
-    const u = new SpeechSynthesisUtterance(text);
-    const voices = speechSynthesis.getVoices();
-    const kr = voices.filter(v=>v.lang.startsWith('ko'));
-    if (kr.length) u.voice = kr[0];
-    u.rate = 0.95; u.pitch = 1;
-    u.onend = ()=>resolve();
-    u.onerror = ()=>resolve();
-    speechSynthesis.speak(u);
-  }});
-}}
-
-async function readSection(i) {{
-  const s = SECTIONS[i];
-  const lines = [s.title];
-  for (const b of s.blocks) {{
-    if (b.type==='p') lines.push(b.content);
-    else if (b.type==='list') lines.push(...b.content);
-    else if (b.type==='code') lines.push('코드블록');
-    else if (b.type==='table') lines.push('표');
-  }}
-  const text = lines.join('. ').substring(0, 2000);
-  document.getElementById('ttsIndicator').classList.add('show');
-  showSection(i);
-  await speak(text);
-  document.getElementById('ttsIndicator').classList.remove('show');
-}}
-
-// ── PLAY ALL ──
-async function togglePlay() {{
-  if (playing) {{ stopPlay(); return; }}
-  playing = true;
-  const btn = document.getElementById('playBtn');
-  btn.textContent = '⏸ Stop'; btn.classList.add('playing');
-  document.getElementById('nextBtn').style.display = 'none';
-
-  for (let i=idx; i<SECTIONS.length; i++) {{
-    if (!playing) break;
-    await readSection(i);
-    if (i<SECTIONS.length-1 && playing) await new Promise(r=>setTimeout(r,500));
-  }}
-  if (playing) {{ stopPlay(); }}
-}}
-
-function stopPlay() {{
-  playing = false;
-  window.speechSynthesis?.cancel();
-  const btn = document.getElementById('playBtn');
-  btn.textContent = '▶ Play All'; btn.classList.remove('playing');
-  document.getElementById('ttsIndicator').classList.remove('show');
-  document.getElementById('nextBtn').style.display = idx>=SECTIONS.length-1 ? 'none' : '';
-}}
-
-// ── 영상 익스포트 ──
-async function exportVideo() {{
-  const btn = event.target;
-  btn.textContent = '⏳ 녹화중...'; btn.disabled = true;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 720; canvas.height = 1280;
-  const ctx = canvas.getContext('2d');
-  const stream = canvas.captureStream(30);
-  const chunks = [];
-  const rec = new MediaRecorder(stream, {{mimeType:'video/webm;codecs=vp9'}});
-  rec.ondataavailable = e => chunks.push(e.data);
-  rec.start();
-
-  for (let i=0; i<SECTIONS.length; i++) {{
-    const s = SECTIONS[i];
-    // Draw frame
-    const grad = ctx.createLinearGradient(0,0,0,1280);
-    grad.addColorStop(0,'#0f172a'); grad.addColorStop(0.5,'#1e1a3a'); grad.addColorStop(1,'#0f172a');
-    ctx.fillStyle = grad; ctx.fillRect(0,0,720,1280);
-    ctx.fillStyle = '#475569'; ctx.font='12px system-ui'; ctx.fillText('HELENA STUDIO',560,50);
-    ctx.fillStyle = '#6366f1'; ctx.font='14px system-ui'; ctx.fillText(`SECTION ${{i+1}}/${{SECTIONS.length}}`,50,130);
-    ctx.fillStyle = '#f8fafc'; ctx.font='bold 32px system-ui';
-    const tl = wrapText(ctx, s.title, 620);
-    tl.forEach((l,j)=>ctx.fillText(l, 50, 200+j*45));
-
-    ctx.fillStyle = '#cbd5e1'; ctx.font='20px system-ui';
-    let y = 200+tl.length*45+40;
-    for (const b of s.blocks) {{
-      let t = '';
-      if (b.type==='p') t = b.content;
-      else if (b.type==='list') t = b.content.join('. ');
-      if (t) {{
-        const bl = wrapText(ctx, t.substring(0,300), 620);
-        bl.slice(0,8).forEach(l=>{{ if(y<1200) ctx.fillText(l,50,y); y+=30; }});
+    // 블록 렌더링
+    let accordionIdx=0;
+    for(const b of s.blocks){{
+      if(b.type==='p') html+=`<div class="glass"><p>${{esc(b.content)}}</p></div>`;
+      else if(b.type==='list'){{
+        html+=`<ul class="glass-list">`;
+        b.content.forEach(l=>html+=`<li>${{esc(l)}}</li>`);
+        html+=`</ul>`;
+      }}
+      else if(b.type==='mermaid'){{
+        html+=`<div class="mermaid-glass"><div class="mermaid" id="mm${{i}}">${{esc(b.content)}}</div></div>`;
+      }}
+      else if(b.type==='table') html+=renderTable(b.content);
+      else if(b.type==='code'){{
+        html+=`<div class="accordion" id="acc${{i}}_${{accordionIdx}}">`;
+        html+=`<div class="accordion-header" onclick="toggleAccordion('acc${{i}}_${{accordionIdx}}')">`;
+        html+=`<span>💻 코드 보기</span><span class="accordion-arrow">▼</span></div>`;
+        html+=`<div class="accordion-body"><div class="code-glass"><pre>${{esc(b.content)}}</pre></div></div></div>`;
+        accordionIdx++;
       }}
     }}
 
-    // Progress bar
-    ctx.fillStyle = '#1e293b'; ctx.fillRect(50,1230,620,3);
-    ctx.fillStyle = '#6366f1'; ctx.fillRect(50,1230,620*(i+1)/SECTIONS.length,3);
-    ctx.fillStyle = '#475569'; ctx.font='11px system-ui'; ctx.fillText(`${{i+1}}/${{SECTIONS.length}}`,660,1255);
+    // 인포그래픽 자동 감지: 숫자 패턴
+    const nums=extractNumbers(s);
+    if(nums.length>=2){{
+      html+=`<div class="info-grid">`;
+      nums.forEach(n=>html+=`<div class="info-tile"><div class="val">${{n.val}}</div><div class="lbl">${{n.lbl}}</div></div>`);
+      html+=`</div>`;
+    }}
+
+    html+=`</div></section>`;
+    return html;
+  }}).join('');
+
+  // Mermaid
+  setTimeout(async()=>{{
+    for(const el of document.querySelectorAll('.mermaid')){{
+      try{{const{{svg}}=await mermaid.render('mm_'+Math.random().toString(36).slice(2),el.textContent);el.innerHTML=svg}}
+      catch(e){{el.innerHTML='<p style=color:var(--red)>Diagram error</p>'}}
+    }}
+  }},200);
+}}
+
+function extractNumbers(s){{
+  const nums=[];
+  const text=s.title+' '+s.blocks.filter(b=>b.type==='p').map(b=>b.content).join(' ');
+  // "28개" "27🔒" 같은 패턴
+  const m1=text.match(/(\d+)\s*(개|종|레포|🔒|🌐)/g);
+  if(m1) m1.forEach(m=>{{const v=m.match(/(\d+)/);if(v)nums.push({{val:v[1],lbl:m.replace(v[1],'').trim()}});}});
+  return nums.slice(0,6);
+}}
+
+function renderTable(text){{
+  const lines=text.trim().split('\\n');
+  if(lines.length<2)return'';
+  const parseRow=l=>l.split('|').filter(c=>c.trim()).map(c=>c.trim());
+  const header=parseRow(lines[0]);
+  const rows=lines.slice(2).map(parseRow);
+  let h='<div class="table-glass"><table><thead><tr>';
+  header.forEach(c=>h+=`<th>${{esc(c)}}</th>`);
+  h+='</tr></thead><tbody>';
+  rows.forEach(r=>{{h+='<tr>';r.forEach(c=>h+=`<td>${{esc(c)}}</td>`);h+='</tr>'}});
+  h+='</tbody></table></div>';
+  return h;
+}}
+
+// 아코디언
+function toggleAccordion(id){{document.getElementById(id).classList.toggle('open')}}
+
+// 내비
+function renderNavDots(){{
+  document.getElementById('navDots').innerHTML=SECTIONS.map((_,i)=>
+    `<div class="nav-dot" id="dot${{i}}" onclick="goTo(${{i}})" title="${{SECTIONS[i].title.substring(0,30)}}"></div>`).join('');
+}}
+function updateNav(){{
+  document.querySelectorAll('.nav-dot').forEach((d,i)=>{{d.classList.toggle('active',i===idx);d.classList.toggle('done',i<idx)}});
+  document.getElementById('progressBar').style.width=((idx+1)/SECTIONS.length*100)+'%';
+}}
+function goTo(i){{
+  document.querySelectorAll('.slide')[i]?.scrollIntoView({{behavior:'smooth'}});
+  idx=i;updateNav();
+}}
+
+// TTS
+function speak(text){{
+  return new Promise(resolve=>{{
+    if(!window.speechSynthesis){{setTimeout(resolve,text.length*55);return}}
+    const u=new SpeechSynthesisUtterance(text.substring(0,2000));
+    const voices=speechSynthesis.getVoices();
+    const kr=voices.filter(v=>v.lang.startsWith('ko'));
+    if(kr.length)u.voice=kr[0];
+    u.rate=0.92;u.pitch=1;
+    u.onend=()=>resolve();u.onerror=()=>resolve();
+    speechSynthesis.speak(u);
+  }});
+}}
+async function readSection(i){{
+  const s=SECTIONS[i];
+  let text=s.title+'. ';
+  for(const b of s.blocks){{
+    if(b.type==='p')text+=b.content+'. ';
+    else if(b.type==='list')text+=b.content.join('. ')+'. ';
+  }}
+  document.getElementById('ttsBadge').classList.add('on');
+  goTo(i);
+  await speak(text);
+  document.getElementById('ttsBadge').classList.remove('on');
+}}
+
+// Play All
+async function togglePlay(){{
+  if(playing){{stopPlay();return}}
+  playing=true;
+  const btn=document.getElementById('playBtn');
+  btn.textContent='⏸ Stop';btn.classList.add('playing');
+  for(let i=idx;i<SECTIONS.length;i++){{
+    if(!playing)break;
+    await readSection(i);
+    if(i<SECTIONS.length-1&&playing)await new Promise(r=>setTimeout(r,600));
+  }}
+  if(playing)stopPlay();
+}}
+function stopPlay(){{
+  playing=false;window.speechSynthesis?.cancel();
+  const btn=document.getElementById('playBtn');
+  btn.textContent='▶ Play All';btn.classList.remove('playing');
+  document.getElementById('ttsBadge').classList.remove('on');
+}}
+
+// 영상 익스포트
+async function exportVideo(){{
+  const btn=event.target;btn.textContent='⏳';btn.disabled=true;
+  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
+  const ctx=canvas.getContext('2d');
+  const stream=canvas.captureStream(30);
+  const chunks=[];const rec=new MediaRecorder(stream,{{mimeType:'video/webm;codecs=vp9'}});
+  rec.ondataavailable=e=>chunks.push(e.data);rec.start();
+
+  for(let i=0;i<SECTIONS.length;i++){{
+    const s=SECTIONS[i];
+    const grad=ctx.createLinearGradient(0,0,0,1280);
+    grad.addColorStop(0,'#050510');grad.addColorStop(0.5,'#0a0a20');grad.addColorStop(1,'#050510');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,720,1280);
+
+    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.beginPath();
+    ctx.roundRect(30,30,660,1220,20);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(30,30,660,1220,20);ctx.stroke();
+
+    ctx.fillStyle='#818cf8';ctx.font='11px system-ui';ctx.fillText(f'SECTION ${{i+1}}/${{SECTIONS.length}}',60,80);
+
+    ctx.fillStyle='#e8e8f0';ctx.font='bold 30px system-ui';
+    const tl=wrapText(ctx,s.title,600);
+    tl.forEach((l,j)=>ctx.fillText(l,60,140+j*42));
+
+    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='19px system-ui';
+    let y=140+tl.length*42+30;
+    for(const b of s.blocks){{
+      let t='';if(b.type==='p')t=b.content;else if(b.type==='list')t=b.content.join('. ');
+      if(t){{const bl=wrapText(ctx,t.substring(0,250),600);bl.slice(0,6).forEach(l=>{{if(y<1180){{ctx.fillText(l,60,y);y+=28}}}});}}
+    }}
+
+    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(30,1230,660,3);
+    ctx.fillStyle='#818cf8';ctx.fillRect(30,1230,660*(i+1)/SECTIONS.length,3);
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px system-ui';ctx.fillText(f'${{i+1}}/${{SECTIONS.length}}',650,1255);
 
     await readSection(i);
-    if (i<SECTIONS.length-1) await new Promise(r=>setTimeout(r,300));
+    if(i<SECTIONS.length-1)await new Promise(r=>setTimeout(r,300));
   }}
+  ctx.fillStyle='#050510';ctx.fillRect(0,0,720,1280);
+  ctx.fillStyle='#e8e8f0';ctx.font='bold 28px system-ui';ctx.fillText('✓ 완료',60,600);
+  await new Promise(r=>setTimeout(r,1500));
+  rec.stop();await new Promise(r=>rec.onstop=r);
 
-  // End frame
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,720,1280);
-  ctx.fillStyle = '#f8fafc'; ctx.font='bold 30px system-ui';
-  ctx.fillText('완료',50,600);
-  await new Promise(r=>setTimeout(r,2000));
-
-  rec.stop();
-  await new Promise(r=>rec.onstop=r);
-
-  const blob = new Blob(chunks,{{type:'video/webm'}});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'helena-studio.webm';
-  a.click();
-
-  btn.textContent = '📥 영상저장'; btn.disabled = false;
+  const blob=new Blob(chunks,{{type:'video/webm'}});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='helena-studio.webm';a.click();
+  btn.textContent='📥 저장';btn.disabled=false;
 }}
 
-function wrapText(ctx, text, maxW) {{
-  const words = text.split(' '), lines = []; let line = '';
-  for (const w of words) {{
-    const t = line ? line+' '+w : w;
-    if (ctx.measureText(t).width > maxW && line) {{ lines.push(line); line = w; }}
-    else line = t;
-  }}
-  if (line) lines.push(line);
-  return lines;
+function wrapText(ctx,text,maxW){{
+  const words=text.split(' '),lines=[];let line='';
+  for(const w of words){{const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){{lines.push(line);line=w}}else line=t}}
+  if(line)lines.push(line);return lines;
 }}
-
-// ── UTIL ──
-function esc(s) {{ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }}
+function esc(s){{const d=document.createElement('div');d.textContent=s;return d.innerHTML}}
 </script>
 </body></html>'''
 
 
-# ── CLI ──
 def main():
-    ap = argparse.ArgumentParser(description="마크다운 → 인터랙티브 HTML + 영상익스포트")
+    ap = argparse.ArgumentParser(description="마크다운 → 프리미엄 인터랙티브 HTML")
     ap.add_argument("source", help=".md 파일")
-    ap.add_argument("--output","-o", help="출력 .html 경로")
+    ap.add_argument("--output", "-o", help="출력 .html")
     args = ap.parse_args()
 
     text = Path(args.source).read_text(encoding="utf-8", errors="replace")
     blocks = parse_markdown_full(text)
     sections = group_sections(blocks)
-
-    if not sections:
-        print("❌ 섹션 없음"); return
-
-    # 제목 추출
+    if not sections: print("❌ 섹션 없음"); return
     title = sections[0]["title"] if sections else Path(args.source).stem
-
     html = generate_html(sections, title)
-
     out = args.output or f"/tmp/{Path(args.source).stem}.html"
     Path(out).write_text(html, encoding="utf-8")
-    print(f"✅ {out} ({len(sections)}섹션, {len(html)/1024:.0f}KB)")
-    print(f"   브라우저에서 열고 '▶ Play All' 누르면 TTS 읽어줌")
-    print(f"   '📥 영상저장' 누르면 전체 세션 WebM 저장")
+    print(f"✅ {out}")
+    print(f"   {len(sections)}섹션 · {len(html)/1024:.0f}KB")
+    print(f"   풀스크린 · 글래스모피즘 · 아코디언 · Mermaid")
+    print(f"   '▶ Play All' → TTS 자동넘김 → '📥 저장' → WebM")
 
 
 if __name__ == "__main__":
