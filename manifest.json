@@ -1,0 +1,21 @@
+{
+  "name": "Helena Studio — 웹페이지→영상",
+  "short_name": "Helena Studio",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "description": "웹페이지 URL → TTS + 스크린샷 → MP4 영상 자동 생성. S21 단독, 0원.",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
