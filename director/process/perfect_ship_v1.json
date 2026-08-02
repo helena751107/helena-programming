@@ -1,0 +1,179 @@
+{
+  "id": "perfect_ship_v1",
+  "name": "Perfect Ship Ladder — 만점 강제 프로세스",
+  "version": 1,
+  "status": "canonical",
+  "one_liner": "만점까지 고정 사다리. 에이전트 마음대로 연출·검수 금지. 게이트만 통과하면 SHIP.",
+  "authority": [
+    "process/perfect_ship_v1.json",
+    "directing/product_tour_v1.json",
+    "policy/tutorial_v1.json",
+    "enforce.py + perfect_ship.py",
+    "scenarios/*.json",
+    "run_director.py"
+  ],
+  "anti_patterns": [
+    {
+      "id": "AP1_cursor_on_metrics",
+      "desc": "커서가 FILES/COMMITS 등 메트릭 그리드에 주차",
+      "fix": "cursor_on_primary + overlay v4 resolveTarget ban"
+    },
+    {
+      "id": "AP2_fake_ship_clicks",
+      "desc": "successful_clicks만 통과하고 화면에 링/리플 없음",
+      "fix": "require_visual_proof gold/teal PNG"
+    },
+    {
+      "id": "AP3_drop_multiclick",
+      "desc": "시간 예산 때문에 2차 클릭(arch/wc) 스킵",
+      "fix": "require_all_declared_clicks + multi-click pad"
+    },
+    {
+      "id": "AP4_no_result_hold",
+      "desc": "클릭 직후 바로 다음 비트 — 상태 변화 안 보임",
+      "fix": "result hold in act + hold phase re-lock"
+    },
+    {
+      "id": "AP5_llm_freeform",
+      "desc": "세션마다 다른 순서로 품질 땜빵",
+      "fix": "이 process 사다리만 허용 — perfect_ship.py verify"
+    },
+    {
+      "id": "AP6_metric_only_vqa",
+      "desc": "VQA 100이지만 사람 프레임이 실패",
+      "fix": "human_frame_audit samples + anti_pattern checks"
+    },
+    {
+      "id": "AP7_no_auto_zoom",
+      "desc": "소프트 scale 없이 평평한 녹화 — Screen Studio/recast 줌 없음",
+      "fix": "overlays.js autoZoom + actions.auto_zoom"
+    },
+    {
+      "id": "AP8_no_tts_first",
+      "desc": "영상 먼저 찍고 TTS 맞춤 — A/V 싱크 붕괴",
+      "fix": "voice_engine TTS-first → shoot wall-clock = audio"
+    }
+  ],
+  "ladder": [
+    {
+      "id": "L0_SCOUT",
+      "name": "Scout page",
+      "must": ["scout.json exists", "interactives counted"],
+      "artifact": "work/scout.json",
+      "fail_exit": 3
+    },
+    {
+      "id": "L1_DIRECTING",
+      "name": "Stamp directing + policy",
+      "must": [
+        "scenario.directing == product_tour_v1",
+        "scenario.policy == tutorial_v1",
+        "pre_shoot enforce OK"
+      ],
+      "artifact": "work/directing.json",
+      "fail_exit": 3
+    },
+    {
+      "id": "L2_VOICE",
+      "name": "TTS-first + humanize + multi-click pad",
+      "must": [
+        "tts_first true (audio duration before shoot)",
+        "tts_humanize true",
+        "provider edge+humanize OR openai-tts-1-hd",
+        "multi-click beats pad >= 0.4 + 1.75*(n-1)"
+      ],
+      "artifact": "work/voice/*_raw.mp3 + humanized .mp3",
+      "fail_exit": 3
+    },
+    {
+      "id": "L3_SHOOT",
+      "name": "5-act shoot + overlay v4 + auto-zoom",
+      "must": [
+        "shoot_version >= 5",
+        "overlay_version >= 4",
+        "phases_played 5 ids per beat",
+        "cursor_on_primary true",
+        "auto_zoom true (zoom_events)",
+        "collapse before tour",
+        "all declared clicks done"
+      ],
+      "artifact": "work/actions_log.json",
+      "fail_exit": 4
+    },
+    {
+      "id": "L4_PROOF",
+      "name": "Visual proof frames",
+      "must": [
+        "visual_proof_pass",
+        "visual_proof_pass_count >= min_visual_proof_pass"
+      ],
+      "artifact": "work/proof/*.png",
+      "fail_exit": 4
+    },
+    {
+      "id": "L5_EDIT",
+      "name": "Edit + lead black trim + intro concat",
+      "must": ["body+intro reencode concat", "no pure black at t~2.0"],
+      "artifact": "out/*.mp4",
+      "fail_exit": 2
+    },
+    {
+      "id": "L6_QUALITY",
+      "name": "Quality gate G1–G7",
+      "must": ["quality.pass == true"],
+      "artifact": "work/gate/quality_report.json",
+      "fail_exit": 2
+    },
+    {
+      "id": "L7_VISION_QA",
+      "name": "Vision QA perfect bar",
+      "must": [
+        "vision_qa.score >= vision_qa_pass_score",
+        "V1 intro not black hard pass",
+        "V4 gold ring hard pass"
+      ],
+      "artifact": "work/vision_qa/vision_qa.json",
+      "fail_exit": 5
+    },
+    {
+      "id": "L8_PROCESS_VERIFY",
+      "name": "perfect_ship.py verify ladder",
+      "must": ["all ladder stages pass", "process_report.json written"],
+      "artifact": "out/*.process.json",
+      "fail_exit": 6
+    },
+    {
+      "id": "L9_SHIP",
+      "name": "TG / deploy allowed",
+      "must": ["L0–L8 all pass", "no freeform agent skip"],
+      "artifact": "SHIP badge in stdout",
+      "fail_exit": 0
+    }
+  ],
+  "remediation_map": {
+    "AP1_cursor_on_metrics": "overlays.js v4 holdFocus/focus must moveCursorTo; park y<=0.40",
+    "AP2_fake_ship_clicks": "capture_proof pre/post; enforce require_visual_proof",
+    "AP3_drop_multiclick": "voice_engine.multi_click_pad; shoot never break mid-clicks",
+    "AP4_no_result_hold": "act result wait; hold re-lock primary",
+    "AP5_llm_freeform": "only python3 perfect_ship.py or run_director --process perfect_ship_v1",
+    "AP6_metric_only_vqa": "process verify + proof sample audit",
+    "AP7_no_auto_zoom": "overlays.js autoZoom(scale~1.14); drainZoomLog → actions.auto_zoom",
+    "AP8_no_tts_first": "voice_engine.synthesize_beat before shoot; edit tpad freeze when VO longer"
+  },
+  "agent_rules": [
+    "만점 올리기 = 이 사다리 실행. 새 스크립트 즉흥 작성 금지.",
+    "게이트 실패 시 remediation_map 키만 패치 후 사다리 재실행.",
+    "SHIP 배지 없이 TG 전송 금지.",
+    "policy/directing/process JSON 변경 없이 '이번만' 예외 금지.",
+    "A-bar 기본: --format shorts_1080 · TTS-first · auto-zoom · optional --subs."
+  ],
+  "cli": {
+    "canonical": "python3 perfect_ship.py --scenario scenarios/X.json --out out/X.mp4 --format shorts_1080 --subs",
+    "alias": "python3 run_director.py --process perfect_ship_v1 --format shorts_1080 --subs"
+  },
+  "community_bar": {
+    "peers": ["playwright-recast", "Purple Owl", "Playwright Screencast showActions"],
+    "we_have": ["perfect_ship ladder", "vision_qa", "visual_proof", "5-act directing", "auto_zoom", "tts_first"],
+    "still_optional": ["ElevenLabs (OPENAI_API_KEY or edge fallback)", "frame interpolation", "idle speed-up"]
+  }
+}

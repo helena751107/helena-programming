@@ -73,6 +73,12 @@ def enforce_scenario(scenario: dict, policy: dict, *, scout: dict | None = None)
         if not scenario.get("scout_merged") and not scenario.get("from_scout"):
             errs.append("scout_before_write: provide scout or generate from scout")
 
+    if req.get("require_directing"):
+        want = req.get("directing_id") or "product_tour_v1"
+        got = scenario.get("directing")
+        if got != want:
+            errs.append(f"scenario.directing must be '{want}' (got {got!r}) — 연출 설정 없이 촬영 금지")
+
     if req.get("clicks_required_when_scout_has_interactive") and scout:
         # at least some beats must declare clicks if scout found interactives
         inter = scout.get("interactive_count") or 0
@@ -83,7 +89,12 @@ def enforce_scenario(scenario: dict, policy: dict, *, scout: dict | None = None)
     return errs
 
 
-def enforce_actions(actions_log: dict, policy: dict) -> list[str]:
+def enforce_actions(
+    actions_log: dict,
+    policy: dict,
+    *,
+    scenario: dict | None = None,
+) -> list[str]:
     req = policy.get("require") or {}
     errs: list[str] = []
     if req.get("actions_log_required") and not actions_log:
@@ -92,8 +103,18 @@ def enforce_actions(actions_log: dict, policy: dict) -> list[str]:
     need = req.get("min_successful_clicks", 0)
     if ok_clicks < need:
         errs.append(f"successful_clicks {ok_clicks} < required {need}")
+    # perfect_ship: every declared scenario click must succeed
+    if req.get("require_all_declared_clicks") and scenario:
+        declared = sum(len(b.get("clicks") or []) for b in (scenario.get("beats") or []))
+        if declared and ok_clicks < declared:
+            errs.append(
+                f"declared clicks {declared} but successful_clicks {ok_clicks} "
+                f"— multi-click drop forbidden (AP3)"
+            )
     if req.get("show_cursor_highlight") and not actions_log.get("cursor_highlight"):
         errs.append("cursor_highlight not enabled in shoot")
+    if req.get("require_cursor_on_primary") and not actions_log.get("cursor_on_primary"):
+        errs.append("cursor_on_primary false — metrics parking forbidden (AP1)")
     if req.get("show_caption_bar") and not actions_log.get("caption_bar"):
         errs.append("caption_bar not enabled in shoot")
     if req.get("show_spotlight") and not actions_log.get("spotlight"):
@@ -106,11 +127,54 @@ def enforce_actions(actions_log: dict, policy: dict) -> list[str]:
         )
     if req.get("page_ready_contract") and not actions_log.get("page_ready"):
         errs.append("page_ready contract not logged")
+    if req.get("require_tts_humanize") and not actions_log.get("tts_humanize"):
+        errs.append("tts_humanize false — raw edge-tts ship forbidden (L2)")
+    if req.get("require_tts_first") and not actions_log.get("tts_first"):
+        errs.append("tts_first false — audio must lead shoot clock (AP8)")
+    if req.get("require_auto_zoom") and not (
+        actions_log.get("auto_zoom") or actions_log.get("zoom_events")
+    ):
+        errs.append("auto_zoom missing — focus must zoom primary (AP7)")
+    if req.get("require_process"):
+        want = req.get("process_id") or policy.get("process_id") or "perfect_ship_v1"
+        got = actions_log.get("process_id")
+        if got != want:
+            errs.append(f"process_id must be '{want}' (got {got!r}) — use perfect_ship.py")
     fails = actions_log.get("failed_clicks") or []
     # under tutorial, failed required clicks are errors
     for f in fails:
         if not f.get("optional", False):
             errs.append(f"required click failed: {f.get('selector')}")
+    # Visual proof (pro v3): proof frames must show gold ring + teal accents
+    if req.get("require_visual_proof"):
+        if not actions_log.get("visual_proof_pass"):
+            errs.append(
+                f"visual_proof_pass false "
+                f"({actions_log.get('visual_proof_pass_count', 0)}/"
+                f"{actions_log.get('visual_proof_total', 0)} frames)"
+            )
+        min_proof = req.get("min_visual_proof_pass", 2)
+        if (actions_log.get("visual_proof_pass_count") or 0) < min_proof:
+            errs.append(
+                f"visual_proof_pass_count "
+                f"{actions_log.get('visual_proof_pass_count')} < {min_proof}"
+            )
+    # v5: every beat must play 5-act directing phases
+    if req.get("require_phases_played") or req.get("require_directing"):
+        phases_played = actions_log.get("phases_played") or []
+        need_ph = ["establish", "focus", "act", "hold", "release"]
+        if not phases_played:
+            errs.append("phases_played missing — shoot must play directing 5-act")
+        for entry in phases_played:
+            got = [p.get("id") for p in (entry.get("phases") or [])]
+            if got != need_ph:
+                errs.append(
+                    f"beat {entry.get('beat')}: phases {got} != {need_ph}"
+                )
+        if (actions_log.get("shoot_version") or 0) < 5 and req.get("require_phases_played"):
+            errs.append(
+                f"shoot_version {actions_log.get('shoot_version')} < 5"
+            )
     return errs
 
 
@@ -133,17 +197,25 @@ def enforce_all(
     actions_log: dict | None,
     quality: dict | None,
     stage: str = "pre_ship",
+    process_report: dict | None = None,
 ) -> None:
     """stage: pre_shoot | post_shoot | pre_ship"""
     errs: list[str] = []
     errs += enforce_scenario(scenario, policy, scout=scout)
     if stage in ("post_shoot", "pre_ship"):
-        errs += enforce_actions(actions_log or {}, policy)
+        errs += enforce_actions(actions_log or {}, policy, scenario=scenario)
     if stage == "pre_ship":
         errs += enforce_quality(quality or {}, policy)
         ship = policy.get("ship") or {}
         if ship.get("block_without_scout_json") and scout is None:
             errs.append("ship requires scout.json")
+        if ship.get("block_without_process_verify") or (policy.get("require") or {}).get(
+            "require_process"
+        ):
+            if process_report is not None and not process_report.get("ship"):
+                errs.append("perfect_ship process_report.ship false — ladder incomplete")
+            # process_report optional at pre_ship inside run_director;
+            # perfect_ship.py is the final gate (exit 6)
     if errs:
         raise EnforceError(errs)
 

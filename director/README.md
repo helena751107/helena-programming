@@ -1,51 +1,103 @@
-# Director Agent — forced tutorial pipeline
+# Director Agent — Perfect Ship (만점 강제)
 
-**URL → 하이테크 튜토리얼 영상.**  
-LLM 마음대로 연출 금지. **policy + schema + deterministic enforce** 가 강제한다.
+**URL → 제품 투어 영상.**  
+에이전트가 세션마다 마음대로 품질 땜빵하는 것 **금지**.
 
-## MCP가 필요한가?
+> **영상 3트랙 중 V2 (Grok 구독 파이프).**  
+> V1 = PPT 수준 0원 · V2 = 이 Director · V3 = ComfyUI 프로 마감.  
+> 전문: `_notebook/58-video-three-tracks_Grok.md`
 
-**필수는 아님.**  
-강제는 MCP가 아니라 다음 3단으로 한다:
-
-1. `policy/tutorial_v1.json` — 무엇을 반드시 할지 (클릭 수, 캡션, 커서, 블랙 한도…)
-2. `schema/scenario.schema.json` + `enforce.py` — 시나리오/액션로그/품질 실패 시 **exit ≠ 0**
-3. `run_director.py` 단일 진입점 — ship 전 게이트 통과 없으면 산출물 “공식” 취급 금지
-
-MCP는 **나중에** Claude/다른 에이전트에게 `director.run` 툴만 노출할 때 얹으면 된다.  
-지금 단계에서 MCP만 만들면 또 말만 하고 파이프는 안 굳는다.
+## 유일한 진입점
 
 ```bash
 cd helena-programming/director
 
-# 기본 = tutorial_v1 강제
-python3 run_director.py --url https://helena751107.github.io/helena_phone/ \
-  --out out/demo.mp4
+# ✅ CANONICAL — 만점 사다리 전체
+python3 perfect_ship.py \
+  --scenario scenarios/helena_phone.json \
+  --out out/helena_phone.mp4
 
-# 정책 파일만 검사
-python3 -c "from enforce import load_policy; print(load_policy('tutorial_v1')['id'])"
+# 동일 (alias)
+python3 run_director.py --process perfect_ship_v1 \
+  --scenario scenarios/helena_phone.json \
+  --out out/helena_phone.mp4
+
+# 이미 렌더된 work/ 만 재검증
+python3 perfect_ship.py --verify-only \
+  --scenario scenarios/helena_phone.json \
+  --out out/helena_phone_pro_v6.mp4
 ```
 
-## Pipeline
+**SHIP 배지 없이 텔레그램 전송 금지.**
 
-0. Scout → `scout.json`  
-1. Scenario stamp (`policy: tutorial_v1`) + **enforce pre_shoot**  
-2. Voice (edge-tts)  
-3. Intro HTML/CJK  
-4. Shoot + overlays (커서·캡션·프로그레스) + `actions_log.json`  
-5. **enforce post_shoot** (min clicks 등)  
-6. Edit (black trim)  
-7. Quality + **enforce pre_ship**  
-8. Self-audit JSON  
+---
 
-실패 시 exit: `3` pre_shoot · `4` post_shoot · `2` quality/pre_ship  
+## 권위 순서 (하드)
 
-## Files
+```
+process/perfect_ship_v1.json     →  만점 사다리 (L0–L9)
+directing/product_tour_v1.json  →  연출 5막·빛·커서
+policy/tutorial_v1.json          →  ship 금지 조건
+enforce.py + perfect_ship.py     →  결정론 게이트
+scenarios/*.json                 →  대본만
+run_director.py                  →  연주
+vision_qa.py                     →  프레임 점수
+```
 
-| 파일 | 역할 |
+---
+
+## 사다리 (코드화)
+
+| Stage | 이름 | 실패 exit |
+|-------|------|-----------|
+| L0 | Scout | 3 |
+| L1 | Directing + policy stamp | 3 |
+| L2 | TTS humanize + multi-click pad | 3 |
+| L3 | 5-act shoot · overlay v4 · cursor_on_primary · **all declared clicks** | 4 |
+| L4 | Visual proof gold/teal | 4 |
+| L5 | Edit mp4 | 2 |
+| L6 | Quality G1–G7 | 2 |
+| L7 | Vision QA ≥ **100** | 5 |
+| L8 | perfect_ship verify | 6 |
+| L9 | SHIP (TG 허용) | 0 |
+
+게이트 실패 시 → `process/perfect_ship_v1.json` 의 **remediation_map** 키만 패치 → 사다리 재실행.  
+새 임시 스크립트·즉흥 순서 **금지**.
+
+---
+
+## Anti-patterns (강제 차단)
+
+| ID | 증상 | 코드 고정 |
+|----|------|-----------|
+| AP1 | 커서 메트릭 주차 | overlay v4 + `cursor_on_primary` |
+| AP2 | 클릭 숫자만 SHIP | `require_visual_proof` |
+| AP3 | 2차 클릭 드롭 | `require_all_declared_clicks` + multi pad |
+| AP4 | 결과 프레임 없음 | act result hold + hold re-lock |
+| AP5 | 세션마다 다른 순서 | 이 process만 허용 |
+| AP6 | VQA만 만점·사람 프레임 실패 | process report + proof |
+
+---
+
+## 파일
+
+| 경로 | 역할 |
 |------|------|
-| `policy/tutorial_v1.json` | 강제 규칙 |
-| `enforce.py` | 결정론 게이트 |
-| `overlays.js` | 튜토리얼 UI 오버레이 |
-| `QUALITY.md` | 만점 체크리스트 |
-| `../_notebook/48-director-video-recurrence_Grok.md` | 재발일지 |
+| **`perfect_ship.py`** | **만점 진입점** |
+| **`process/perfect_ship_v1.json`** | **사다리 정의** |
+| `directing/product_tour_v1.json` | 5막 연출 |
+| `policy/tutorial_v1.json` | require 전부 |
+| `enforce.py` | 결정론 거부 |
+| `overlays.js` v4 | cursor-lock · zoom |
+| `run_director.py` | 연주 + process stamp |
+| `vision_qa.py` | 프레임 점수 |
+| `QUALITY.md` | 체크리스트 문서 |
+
+---
+
+## 에이전트 규칙 (필수)
+
+1. 만점 올리기 = `python3 perfect_ship.py` 만 실행.
+2. FAIL 시 `.process.json` 의 remediation_ids 만 보고 해당 코드 수정.
+3. SHIP 없이 TG 보내지 말 것.
+4. policy/process/directing JSON 예외 처리 금지.

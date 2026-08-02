@@ -34,76 +34,126 @@ def extract_frame(video: Path, t: float, dest: Path) -> Path:
     return dest
 
 
-def png_stats(path: Path) -> dict:
-    """Mean luminance approx via raw PNG (no PIL). Works for non-interlaced RGB/RGBA."""
+def _paeth(a: int, b: int, c: int) -> int:
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def png_decode_rgb(path: Path) -> tuple[int, int, bytes] | None:
+    """Decode PNG → (w, h, rgb_bytes) with filter types 0–4. RGB/RGBA 8-bit only."""
     data = path.read_bytes()
     if data[:8] != b"\x89PNG\r\n\x1a\n":
-        return {"ok": False, "reason": "not png", "size": path.stat().st_size}
-    # find IHDR
+        return None
     ihdr = data.find(b"IHDR")
     if ihdr < 0:
-        return {"ok": False, "reason": "no IHDR", "size": path.stat().st_size}
+        return None
     w, h = struct.unpack(">II", data[ihdr + 4: ihdr + 12])
     bit_depth = data[ihdr + 12]
     color_type = data[ihdr + 13]
-    # decompress IDAT
+    if bit_depth != 8 or color_type not in (2, 6):
+        return None
     idats = []
     pos = 8
     while pos < len(data):
         if pos + 8 > len(data):
             break
-        length = struct.unpack(">I", data[pos:pos + 4])[0]
-        ctype = data[pos + 4:pos + 8]
-        chunk = data[pos + 8:pos + 8 + length]
+        length = struct.unpack(">I", data[pos: pos + 4])[0]
+        ctype = data[pos + 4: pos + 8]
+        chunk = data[pos + 8: pos + 8 + length]
         pos = pos + 12 + length
         if ctype == b"IDAT":
             idats.append(chunk)
         if ctype == b"IEND":
             break
-    if not idats:
-        return {"ok": False, "reason": "no IDAT", "w": w, "h": h, "size": path.stat().st_size}
     try:
         raw = zlib.decompress(b"".join(idats))
-    except Exception as e:
-        return {"ok": False, "reason": f"zlib {e}", "size": path.stat().st_size}
+    except Exception:
+        return None
+    bpp = 3 if color_type == 2 else 4
+    stride = w * bpp
+    out = bytearray(h * stride)
+    prev = bytearray(stride)
+    i = 0
+    for y in range(h):
+        if i >= len(raw):
+            return None
+        f = raw[i]
+        i += 1
+        row = bytearray(raw[i: i + stride])
+        i += stride
+        if f == 1:
+            for x in range(bpp, stride):
+                row[x] = (row[x] + row[x - bpp]) & 255
+        elif f == 2:
+            for x in range(stride):
+                row[x] = (row[x] + prev[x]) & 255
+        elif f == 3:
+            for x in range(stride):
+                left = row[x - bpp] if x >= bpp else 0
+                row[x] = (row[x] + ((left + prev[x]) // 2)) & 255
+        elif f == 4:
+            for x in range(stride):
+                left = row[x - bpp] if x >= bpp else 0
+                up = prev[x]
+                ul = prev[x - bpp] if x >= bpp else 0
+                row[x] = (row[x] + _paeth(left, up, ul)) & 255
+        elif f != 0:
+            return None
+        out[y * stride: (y + 1) * stride] = row
+        prev = row
+    if bpp == 4:
+        rgb = bytearray(h * w * 3)
+        for p in range(w * h):
+            rgb[p * 3: p * 3 + 3] = out[p * 4: p * 4 + 3]
+        return w, h, bytes(rgb)
+    return w, h, bytes(out)
 
-    if color_type == 2:  # RGB
-        bpp = 3
-    elif color_type == 6:  # RGBA
-        bpp = 4
-    elif color_type == 0:  # gray
-        bpp = 1
-    else:
-        # fallback: file size heuristic
-        sz = path.stat().st_size
+
+def accent_counts(path: Path) -> dict:
+    """Gold / teal overlay accent pixel counts (unfiltered PNG)."""
+    decoded = png_decode_rgb(path)
+    if not decoded:
+        return {"gold": 0, "teal": 0, "ok": False}
+    w, h, rgb = decoded
+    gold = teal = 0
+    n = w * h
+    step = max(1, n // 120_000)
+    for p in range(0, n, step):
+        i = p * 3
+        r, g, b = rgb[i], rgb[i + 1], rgb[i + 2]
+        if r > 175 and 120 < g < 245 and b < 160 and r > b + 35 and r + g > 320:
+            gold += 1
+        if 15 < r < 140 and 130 < g < 245 and 110 < b < 230 and g > r + 30 and g > b - 10:
+            teal += 1
+    return {"gold": gold, "teal": teal, "ok": True, "w": w, "h": h}
+
+
+def png_stats(path: Path) -> dict:
+    """Mean luminance via properly unfiltered PNG (no PIL)."""
+    decoded = png_decode_rgb(path)
+    if not decoded:
+        sz = path.stat().st_size if path.exists() else 0
         return {
-            "ok": True, "w": w, "h": h, "size": sz,
+            "ok": True, "size": sz,
             "mean_y": None, "black_ratio": None,
             "heuristic": "complex_png", "complex": sz > 25_000,
         }
-
-    stride = w * bpp + 1  # filter byte
-    if len(raw) < stride * h:
-        return {"ok": False, "reason": "raw short", "size": path.stat().st_size}
-
-    # sample every Nth pixel for speed
-    total = 0
-    black = 0
-    n = 0
+    w, h, rgb = decoded
+    total = black = n = 0
     step = max(1, (w * h) // 80_000)
-    for y in range(h):
-        row = raw[y * stride + 1:(y + 1) * stride]
-        for x in range(0, w, step):
-            i = x * bpp
-            if bpp >= 3:
-                r, g, b = row[i], row[i + 1], row[i + 2]
-                yv = (r * 3 + g * 6 + b) // 10
-            else:
-                yv = row[i]
-            total += yv
-            if yv < 12:
-                black += 1
-            n += 1
+    for p in range(0, w * h, step):
+        i = p * 3
+        r, g, b = rgb[i], rgb[i + 1], rgb[i + 2]
+        yv = (r * 3 + g * 6 + b) // 10
+        total += yv
+        if yv < 12:
+            black += 1
+        n += 1
     mean_y = total / max(1, n)
     black_ratio = black / max(1, n)
     return {
@@ -223,6 +273,9 @@ def gate_output(
     extract_frame(video, min(dur * 0.4, max(3.0, dur - 2)), fmid)
     stm = png_stats(fmid)
     mid_ok = stm.get("size", 0) > 40_000 or bool(stm.get("complex"))
+    # reject near-black mid frames even if "complex" PNG size
+    if stm.get("mean_y") is not None and stm["mean_y"] < 8 and (stm.get("black_ratio") or 0) > 0.95:
+        mid_ok = False
     c = {"id": "G3_ui", "pass": mid_ok, "detail": f"mid={stm}"}
     checks.append(c)
     ok = ok and c["pass"]
@@ -236,7 +289,44 @@ def gate_output(
         checks.append(c)
         ok = ok and c["pass"]
 
-    report = {"pass": ok, "duration": dur, "checks": checks}
+    # G7 — sample multiple body frames for gold/teal overlay accents
+    # (pro v3: spotlight ring + chip must appear in the shipped video)
+    accent_hits = 0
+    accent_detail = []
+    sample_ts = [
+        max(2.0, dur * 0.12),
+        max(3.0, dur * 0.28),
+        max(4.0, dur * 0.45),
+        max(5.0, dur * 0.62),
+        max(6.0, min(dur - 1.5, dur * 0.78)),
+    ]
+    for i, t in enumerate(sample_ts):
+        fp = work / f"gate_accent_{i}.png"
+        try:
+            extract_frame(video, t, fp)
+            st = png_stats(fp)
+            ac = accent_counts(fp)
+            gold, teal = ac.get("gold", 0), ac.get("teal", 0)
+            hit = gold >= 40 and teal >= 10
+            if hit:
+                accent_hits += 1
+            accent_detail.append({
+                "t": round(t, 1), "gold": gold, "teal": teal, "hit": hit,
+                "mean_y": st.get("mean_y"),
+            })
+        except Exception as e:
+            accent_detail.append({"t": t, "error": str(e), "hit": False})
+    # need at least 2 of 5 sampled frames showing overlay accents
+    g7_ok = accent_hits >= 2
+    c = {
+        "id": "G7_overlay_accents",
+        "pass": g7_ok,
+        "detail": f"hits={accent_hits}/5 samples={accent_detail}",
+    }
+    checks.append(c)
+    ok = ok and c["pass"]
+
+    report = {"pass": ok, "duration": dur, "checks": checks, "accent_hits": accent_hits}
     (work / "quality_report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )

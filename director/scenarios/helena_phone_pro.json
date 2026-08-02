@@ -1,0 +1,77 @@
+{
+  "id": "helena_phone_pro",
+  "url": "https://helena751107.github.io/helena_phone/",
+  "title": "S21 PHONE — Product Tour",
+  "logline": "한 대의 폰. 돌봄과 소망. Full stack.",
+  "tone": "editorial product tour",
+  "lang": "ko",
+  "voice": "ko-KR-InJoonNeural",
+  "duration_target_sec": 65,
+  "viewport": { "width": 720, "height": 1280 },
+  "beats": [
+    {
+      "id": "b0_cover",
+      "narration": "한 대의 갤럭시. 돌봄은 절대 안 깨지게. 소망은 세상으로.",
+      "camera": { "action": "goto_top" },
+      "clicks": [
+        { "selector": "#cover a.btn.btn-solid, a.btn.btn-solid", "optional": false, "why": "설치 한 줄" }
+      ],
+      "hold_after_ms": 700,
+      "caption": "ONE PHONE · Full stack"
+    },
+    {
+      "id": "b1_tracks",
+      "narration": "투트랙. 트랙 일은 안전망. 트랙 이는 목소리. 동시에 굴립니다.",
+      "camera": { "action": "scroll_to", "selector": "#tracks" },
+      "clicks": [
+        { "selector": "#tracks-head", "optional": false, "why": "듀얼 트랙" }
+      ],
+      "hold_after_ms": 650,
+      "caption": "돌봄과 소망 · 동시에"
+    },
+    {
+      "id": "b2_system",
+      "narration": "폰에서 세상으로. 노드를 짚으면 데이터 길이 보입니다.",
+      "camera": { "action": "scroll_to", "selector": "#system" },
+      "clicks": [
+        { "selector": "#system-head", "optional": false, "why": "시스템 맵" },
+        { "selector": "#archBox g.node, #archBox .node, svg.svg-arch g.node", "optional": false, "why": "노드" }
+      ],
+      "hold_after_ms": 700,
+      "caption": "아키텍처 · 한눈에"
+    },
+    {
+      "id": "b3_agents",
+      "narration": "세 동료. 역할이 다릅니다. 만능 하나보다 분업이 셉니다.",
+      "camera": { "action": "scroll_to", "selector": "#agents" },
+      "clicks": [
+        { "selector": "#agents-head", "optional": false, "why": "에이전트" }
+      ],
+      "hold_after_ms": 600,
+      "caption": "세 동료 · 분업"
+    },
+    {
+      "id": "b4_centers",
+      "narration": "워크센터. 왼쪽을 고르면 오른쪽이 열립니다.",
+      "camera": { "action": "scroll_to", "selector": "#centers" },
+      "clicks": [
+        { "selector": "#centers-head", "optional": false, "why": "센터 맵" },
+        { "selector": "#wcList button.wc-item, #wcList .wc-item", "optional": false, "why": "센터 선택" }
+      ],
+      "hold_after_ms": 650,
+      "caption": "워크센터 · 가동"
+    },
+    {
+      "id": "b5_funnel",
+      "narration": "드래프트에서 독립까지. 투어 끝. 이제 직접 해 보세요.",
+      "camera": { "action": "scroll_to", "selector": "#funnel" },
+      "clicks": [
+        { "selector": "#funnel-head", "optional": false, "why": "퍼널" }
+      ],
+      "hold_after_ms": 800,
+      "caption": "콘텐츠 퍼널 · 끝"
+    }
+  ],
+  "directing": "product_tour_v1",
+  "directing_version": 1
+}
