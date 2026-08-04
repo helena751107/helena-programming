@@ -16,86 +16,71 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0D0D0D; --card:#1A1A1A; --card-hover:#222;
+  --bg:#0D0D0D; --card:#1A1A1A;
   --border:rgba(201,168,76,0.15); --border-hover:rgba(201,168,76,0.35);
   --text:#F5F5DC; --text2:rgba(245,245,220,0.6); --text3:rgba(245,245,220,0.3);
   --gold:#c9a84c; --teal:#2ec4b6;
 }
 html{scroll-behavior:smooth}
-body{font-family:'Inter','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.015;pointer-events:none;z-index:9999}
 a{color:inherit;text-decoration:none}
 
-main{max-width:720px;margin:0 auto;padding:1.5rem;position:relative;z-index:2}
+main{max-width:780px;margin:0 auto;padding:1.5rem;position:relative;z-index:2}
 
-/* Header */
-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 0;margin-bottom:2rem;border-bottom:1px solid var(--border)}
+header{display:flex;justify-content:space-between;align-items:center;padding:1rem 0;margin-bottom:1rem;border-bottom:1px solid var(--border)}
 .logo{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:var(--gold);letter-spacing:.12em}
 .logo-sub{font-size:10px;color:var(--text3);letter-spacing:.08em;display:block}
 .header-r{display:flex;gap:.6rem}
 .hbtn{font-size:11px;color:var(--text2);padding:.35rem .7rem;border:1px solid var(--border);border-radius:6px;transition:all .2s}
 .hbtn:hover{color:var(--gold);border-color:var(--border-hover)}
 
-/* Hero - compact */
-.hero{text-align:center;padding:1rem 0 2rem}
-.hero h1{font-family:'Cinzel',serif;font-size:2rem;font-weight:700;letter-spacing:.04em;margin-bottom:.4rem}
-.hero h1 span{color:var(--gold)}
-.hero p{font-size:13px;color:var(--text3);letter-spacing:.06em}
+/* Graph */
+#graph-container{position:relative;width:100%;height:420px;margin:0 auto 1.5rem;border:1px solid var(--border);border-radius:14px;background:rgba(13,13,13,0.6);overflow:hidden;cursor:grab}
+#graph-container:active{cursor:grabbing}
+#graph-container canvas{display:block}
+.graph-tooltip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--border-hover);border-radius:8px;padding:.5rem .8rem;font-size:12px;color:var(--text);opacity:0;transition:opacity .15s;z-index:10;white-space:nowrap}
+.graph-tooltip .name{font-weight:600;color:var(--gold)}
+.graph-tooltip .desc{font-size:10px;color:var(--text3);margin-top:.1rem}
 
-/* Stats row */
-.stats{display:flex;gap:.6rem;justify-content:center;margin-bottom:2rem;flex-wrap:wrap}
+/* Stats */
+.stats{display:flex;gap:.6rem;justify-content:center;margin-bottom:1.5rem;flex-wrap:wrap}
 .stats span{font-size:11px;color:var(--text3);background:var(--card);padding:.35rem .8rem;border-radius:6px;border:1px solid var(--border)}
 .stats span b{color:var(--gold)}
 
 /* Accordion */
 .acc{margin-bottom:.5rem;border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden;transition:all .3s}
 .acc.open{border-color:var(--border-hover)}
-.acc-head{display:flex;align-items:center;gap:.8rem;padding:1rem 1.2rem;cursor:pointer;user-select:none;transition:background .2s}
+.acc-head{display:flex;align-items:center;gap:.8rem;padding:.9rem 1.2rem;cursor:pointer;user-select:none;transition:background .2s}
 .acc-head:hover{background:rgba(255,255,255,0.02)}
-.acc-icon{font-size:1.4rem;flex-shrink:0}
-.acc-title{flex:1;font-weight:600;font-size:14px}
+.acc-icon{font-size:1.3rem;flex-shrink:0}
+.acc-title{flex:1;font-weight:600;font-size:13px}
 .acc-badge{font-size:10px;color:var(--teal);padding:.15rem .5rem;background:rgba(46,196,182,0.08);border-radius:4px}
-.acc-arrow{font-size:12px;color:var(--text3);transition:transform .3s}
+.acc-arrow{font-size:11px;color:var(--text3);transition:transform .3s}
 .acc.open .acc-arrow{transform:rotate(180deg)}
-.acc-body{display:none;padding:0 1.2rem 1.2rem}
+.acc-body{display:none;padding:0 1.2rem 1rem}
 .acc.open .acc-body{display:block}
 
-/* App list inside accordion */
-.app-item{display:flex;align-items:center;gap:.8rem;padding:.7rem .8rem;border-radius:8px;transition:all .2s;cursor:pointer;margin-bottom:.3rem}
+.app-item{display:flex;align-items:center;gap:.7rem;padding:.6rem .7rem;border-radius:8px;transition:all .2s;cursor:pointer;margin-bottom:.2rem}
 .app-item:hover{background:rgba(255,255,255,0.03)}
-.app-item .emoji{font-size:1.3rem;flex-shrink:0}
+.app-item .emoji{font-size:1.2rem;flex-shrink:0}
 .app-item .info{flex:1;min-width:0}
-.app-item .name{font-size:13px;font-weight:500}
-.app-item .desc{font-size:11px;color:var(--text3);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.app-item .cmd{font-size:10px;font-family:monospace;color:var(--teal);background:rgba(46,196,182,0.06);padding:.2rem .5rem;border-radius:4px;flex-shrink:0}
-.app-item .status{width:6px;height:6px;background:#4ade80;border-radius:50%;flex-shrink:0}
+.app-item .name{font-size:12px;font-weight:500}
+.app-item .desc{font-size:10px;color:var(--text3);margin-top:.1rem}
+.app-item .cmd{font-size:9px;font-family:monospace;color:var(--teal);background:rgba(46,196,182,0.06);padding:.2rem .5rem;border-radius:4px;flex-shrink:0}
 
-/* Node Graph */
-.graph{position:relative;height:280px;margin:1rem 0}
-.graph svg{width:100%;height:100%}
-.graph-node{cursor:pointer;transition:all .3s}
-.graph-node:hover circle{stroke:var(--gold);stroke-width:2}
-.graph-node text{fill:var(--text);font-size:10px;font-family:'Inter','Noto Sans KR',sans-serif;text-anchor:middle}
-.graph-node .sub{fill:var(--text3);font-size:8px}
-.graph-line{stroke:var(--border);stroke-width:1}
-.graph-line.active{stroke:var(--gold);stroke-width:1.5}
+.pipe-step{display:flex;align-items:flex-start;gap:.7rem;padding:.4rem 0}
+.pipe-num{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--gold);flex-shrink:0;font-family:'Cinzel',serif}
+.pipe-body .title{font-size:12px;font-weight:500}
+.pipe-body .cmd{font-size:10px;color:var(--teal);font-family:monospace;margin-top:.1rem}
 
-/* Pipe accordion */
-.pipe-step{display:flex;align-items:flex-start;gap:.8rem;padding:.5rem 0}
-.pipe-num{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gold);flex-shrink:0;font-family:'Cinzel',serif}
-.pipe-body{flex:1;padding-top:.2rem}
-.pipe-body .title{font-size:13px;font-weight:500}
-.pipe-body .cmd{font-size:11px;color:var(--teal);font-family:monospace;margin-top:.1rem}
-
-/* Footer */
-footer{text-align:center;padding:2rem 0 1rem;border-top:1px solid var(--border);margin-top:2rem}
+footer{text-align:center;padding:1.5rem 0 1rem;border-top:1px solid var(--border);margin-top:1.5rem}
 footer p{font-size:11px;color:var(--text3);letter-spacing:.06em}
 footer span{color:var(--gold)}
 
 @media(max-width:480px){
-  main{padding:1rem}
-  .hero h1{font-size:1.6rem}
-  .graph{height:220px}
+  main{padding:.8rem}
+  #graph-container{height:320px}
 }
 </style>
 </head>
@@ -113,103 +98,280 @@ footer span{color:var(--gold)}
   </div>
 </header>
 
-<section class="hero">
-  <h1>생각의 <span>서식</span></h1>
-  <p>소스코드가 아니라 인스트럭션과 MCP — 에이전트를 위한 앱스토어</p>
-  <div class="stats">
-    <span><b>6</b> Tools</span>
-    <span><b>18</b> MCP</span>
-    <span><b>On-Demand</b> No Server</span>
-    <span><b>Vercel</b> Deploy</span>
-  </div>
-</section>
-
-<!-- Node Graph -->
-<div class="graph">
-  <svg viewBox="0 0 720 280">
-    <!-- Lines -->
-    <line x1="360" y1="30" x2="120" y2="100" class="graph-line"/>
-    <line x1="360" y1="30" x2="360" y2="100" class="graph-line"/>
-    <line x1="360" y1="30" x2="600" y2="100" class="graph-line"/>
-    <line x1="120" y1="170" x2="120" y2="230" class="graph-line"/>
-    <line x1="360" y1="170" x2="360" y2="230" class="graph-line"/>
-    <line x1="600" y1="170" x2="600" y2="230" class="graph-line"/>
-    <!-- Center -->
-    <g class="graph-node"><circle cx="360" cy="30" r="28" fill="var(--card)" stroke="var(--gold)" stroke-width="1.5"/><text x="360" y="28" font-size="16">🔧</text><text x="360" y="55" font-size="9" fill="var(--gold)">PROGRAMMING</text></g>
-    <!-- Top tools -->
-    <g class="graph-node"><circle cx="120" cy="100" r="22" fill="var(--card)" stroke="var(--border)"/><text x="120" y="104" font-size="13">🎬</text><text x="120" y="130">Director</text></g>
-    <g class="graph-node"><circle cx="360" cy="100" r="22" fill="var(--card)" stroke="var(--border)"/><text x="360" y="104" font-size="13">📸</text><text x="360" y="130">Image Pipe</text></g>
-    <g class="graph-node"><circle cx="600" cy="100" r="22" fill="var(--card)" stroke="var(--border)"/><text x="600" y="104" font-size="13">🔌</text><text x="600" y="130">Phone MCP</text></g>
-    <!-- Bottom ecosystem -->
-    <g class="graph-node"><circle cx="120" cy="230" r="18" fill="var(--card)" stroke="var(--border)"/><text x="120" y="234" font-size="11">📡</text><text x="120" y="256">Phone</text></g>
-    <g class="graph-node"><circle cx="360" cy="230" r="18" fill="var(--card)" stroke="var(--border)"/><text x="360" y="234" font-size="11">✝️</text><text x="360" y="256">Faith</text></g>
-    <g class="graph-node"><circle cx="600" cy="230" r="18" fill="var(--card)" stroke="var(--border)"/><text x="600" y="234" font-size="11">🛡️</text><text x="600" y="256">PsyCare</text></g>
-  </svg>
+<div id="graph-container">
+  <canvas id="graph"></canvas>
+  <div class="graph-tooltip" id="tooltip"></div>
 </div>
 
-<!-- Accordion 1: Tools -->
-<div class="acc open" id="acc-tools">
+<div class="stats">
+  <span><b>6</b> Tools</span>
+  <span><b>18</b> MCP</span>
+  <span><b>On-Demand</b> No Server</span>
+  <span><b>Vercel</b> Deploy</span>
+  <span><b>Galaxy S21</b> Powered</span>
+</div>
+
+<div class="acc open">
   <div class="acc-head" onclick="this.parentElement.classList.toggle('open')">
-    <span class="acc-icon">🧰</span>
-    <span class="acc-title">Agent Tools</span>
-    <span class="acc-badge">6 active</span>
-    <span class="acc-arrow">▼</span>
+    <span class="acc-icon">🧰</span><span class="acc-title">Agent Tools</span><span class="acc-badge">6 active</span><span class="acc-arrow">▼</span>
   </div>
   <div class="acc-body">
-    <div class="app-item"><span class="status"></span><span class="emoji">🎬</span><div class="info"><div class="name">Director</div><div class="desc">제품 투어 영상 자동화 · L0-L9</div></div><span class="cmd">perfect_ship.py</span></div>
-    <div class="app-item"><span class="status"></span><span class="emoji">📸</span><div class="info"><div class="name">Image Pipe</div><div class="desc">사진 → 영상 → TG 자동 · 터치 0</div></div><span class="cmd">auto_image_pipe.sh</span></div>
-    <div class="app-item"><span class="status"></span><span class="emoji">🎙️</span><div class="info"><div class="name">Episode Produce</div><div class="desc">시리즈 제작 표준 · 4단계</div></div><span class="cmd">episode_produce.sh</span></div>
-    <div class="app-item"><span class="status"></span><span class="emoji">🔌</span><div class="info"><div class="name">Phone MCP</div><div class="desc">18 tools · stdio on-demand</div></div><span class="cmd">node server.js --stdio</span></div>
-    <div class="app-item"><span class="status"></span><span class="emoji">🏥</span><div class="info"><div class="name">Health Check</div><div class="desc">27 checks · Grade A/B/C · TG</div></div><span class="cmd">phone-health.sh</span></div>
-    <div class="app-item"><span class="status"></span><span class="emoji">📝</span><div class="info"><div class="name">Webzine Builder</div><div class="desc">md → html · GitHub Pages</div></div><span class="cmd">build_webzine.py</span></div>
+    <div class="app-item"><span class="emoji">🎬</span><div class="info"><div class="name">Director</div><div class="desc">제품 투어 영상 자동화 · L0–L9</div></div><span class="cmd">perfect_ship.py</span></div>
+    <div class="app-item"><span class="emoji">📸</span><div class="info"><div class="name">Image Pipe</div><div class="desc">사진→영상→TG · 터치 0</div></div><span class="cmd">auto_image_pipe.sh</span></div>
+    <div class="app-item"><span class="emoji">🎙️</span><div class="info"><div class="name">Episode Produce</div><div class="desc">시리즈 제작 표준 · 4단계</div></div><span class="cmd">episode_produce.sh</span></div>
+    <div class="app-item"><span class="emoji">🔌</span><div class="info"><div class="name">Phone MCP</div><div class="desc">18 tools · stdio on-demand</div></div><span class="cmd">node server.js --stdio</span></div>
+    <div class="app-item"><span class="emoji">🏥</span><div class="info"><div class="name">Health Check</div><div class="desc">27 checks · Grade A/B/C</div></div><span class="cmd">phone-health.sh</span></div>
+    <div class="app-item"><span class="emoji">📝</span><div class="info"><div class="name">Webzine Builder</div><div class="desc">md→html · GitHub Pages</div></div><span class="cmd">build_webzine.py</span></div>
   </div>
 </div>
 
-<!-- Accordion 2: Pipe -->
-<div class="acc" id="acc-pipe">
+<div class="acc">
   <div class="acc-head" onclick="this.parentElement.classList.toggle('open')">
-    <span class="acc-icon">⚡</span>
-    <span class="acc-title">How It Works</span>
-    <span class="acc-badge">4 steps</span>
-    <span class="acc-arrow">▼</span>
+    <span class="acc-icon">⚡</span><span class="acc-title">How It Works</span><span class="acc-badge">4 steps</span><span class="acc-arrow">▼</span>
   </div>
   <div class="acc-body">
-    <div class="pipe-step"><div class="pipe-num">1</div><div class="pipe-body"><div class="title">Agent discovers tool</div><div class="cmd">CLAUDE.md → 필요한 도구 파악</div></div></div>
-    <div class="pipe-step"><div class="pipe-num">2</div><div class="pipe-body"><div class="title">MCP stdio spawn</div><div class="cmd">child_process.spawn → stdin/stdout → 종료</div></div></div>
+    <div class="pipe-step"><div class="pipe-num">1</div><div class="pipe-body"><div class="title">Agent discovers tool</div><div class="cmd">CLAUDE.md → 필요 도구 파악</div></div></div>
+    <div class="pipe-step"><div class="pipe-num">2</div><div class="pipe-body"><div class="title">MCP stdio spawn (On-Demand)</div><div class="cmd">child_process.spawn → stdin/stdout → 종료</div></div></div>
     <div class="pipe-step"><div class="pipe-num">3</div><div class="pipe-body"><div class="title">CLI pipeline executes</div><div class="cmd">perfect_ship.py · auto_image_pipe.sh</div></div></div>
     <div class="pipe-step"><div class="pipe-num">4</div><div class="pipe-body"><div class="title">Result delivered</div><div class="cmd">TG · GitHub Pages · YouTube</div></div></div>
   </div>
 </div>
 
-<!-- Accordion 3: Philosophy -->
-<div class="acc" id="acc-phil">
-  <div class="acc-head" onclick="this.parentElement.classList.toggle('open')">
-    <span class="acc-icon">💡</span>
-    <span class="acc-title">Philosophy</span>
-    <span class="acc-arrow">▼</span>
-  </div>
-  <div class="acc-body">
-    <p style="font-family:'Cinzel',serif;font-size:1rem;color:var(--gold);text-align:center;line-height:1.6;padding:.5rem 0">
-      "이 레포는 <span style="color:var(--teal)">소스코드 저장소가 아니다.</span><br>
-      에이전트를 위한 생각의 서식 —<br>인스트럭션 + MCP 도구 + 실행 파이프.<br>
-      <span style="font-size:0.8rem;color:var(--text3)">상시 서버 없음. 필요할 때만 stdio로 spawn.</span>"
-    </p>
-  </div>
-</div>
-
 <footer>
   <p>Built on <span>Galaxy S21</span> · proot Ubuntu · DeepSeek</p>
-  <p style="margin-top:.3rem">© 2026 Helena Programming</p>
+  <p style="margin-top:.3rem">© 2026 Helena Programming — 생각의 서식</p>
 </footer>
 
 </main>
 
 <script>
-// URL 해시로 아코디언 열기
-if(location.hash){
-  const el = document.querySelector(location.hash);
-  if(el) el.classList.add('open');
+// ── Obsidian-style Force Graph ──────────────────────────
+const container = document.getElementById('graph-container');
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+let W, H, mouseX = -100, mouseY = -100, hoverNode = null, dragNode = null;
+let particles = [];
+
+// Nodes
+const nodes = [
+  { id:'prog',   label:'PROGRAMMING', sub:'생각의 서식', x:0,y:0, fx:null,fy:null, r:32, color:'#c9a84c', glow:'rgba(201,168,76,0.6)', type:'center', desc:'에이전트 앱스토어' },
+  { id:'director',label:'Director',  sub:'perfect_ship', x:0,y:0, r:18, color:'#2ec4b6', glow:'rgba(46,196,182,0.4)', type:'tool', desc:'영상 자동화 · L0-L9' },
+  { id:'image',   label:'Image Pipe',sub:'auto_image',  x:0,y:0, r:16, color:'#2ec4b6', glow:'rgba(46,196,182,0.4)', type:'tool', desc:'사진→영상→TG' },
+  { id:'episode', label:'Episode',   sub:'produce',      x:0,y:0, r:14, color:'#2ec4b6', glow:'rgba(46,196,182,0.4)', type:'tool', desc:'시리즈 제작 표준' },
+  { id:'mcp',     label:'Phone MCP', sub:'18 tools',     x:0,y:0, r:18, color:'#e879f9', glow:'rgba(232,121,249,0.4)', type:'tool', desc:'폰 제어 · stdio' },
+  { id:'health',  label:'Health',    sub:'27 checks',    x:0,y:0, r:13, color:'#4ade80', glow:'rgba(74,222,128,0.4)', type:'tool', desc:'건강 검진' },
+  { id:'webzine', label:'Webzine',   sub:'md→html',      x:0,y:0, r:13, color:'#f59e0b', glow:'rgba(245,158,11,0.4)', type:'tool', desc:'문서 빌더' },
+  { id:'phone',   label:'Phone',     sub:'포털',         x:0,y:0, r:15, color:'#94a3b8', glow:'rgba(148,163,184,0.3)', type:'eco', desc:'헬레나폰 포털' },
+  { id:'faith',   label:'Faith',     sub:'신앙',         x:0,y:0, r:12, color:'#94a3b8', glow:'rgba(148,163,184,0.3)', type:'eco', desc:'신앙 콘텐츠' },
+  { id:'log',     label:'Log',       sub:'학습',         x:0,y:0, r:12, color:'#94a3b8', glow:'rgba(148,163,184,0.3)', type:'eco', desc:'학습 로그' },
+  { id:'piano',   label:'Piano',     sub:'연주',         x:0,y:0, r:12, color:'#94a3b8', glow:'rgba(148,163,184,0.3)', type:'eco', desc:'연주 스튜디오' },
+  { id:'psycare', label:'PsyCare',   sub:'돌봄',         x:0,y:0, r:12, color:'#94a3b8', glow:'rgba(148,163,184,0.3)', type:'eco', desc:'돌봄 허브' },
+];
+
+// Edges
+const edges = [
+  ['prog','director'],['prog','image'],['prog','episode'],['prog','mcp'],
+  ['prog','health'],['prog','webzine'],
+  ['director','phone'],['image','phone'],['episode','phone'],
+  ['mcp','phone'],['health','phone'],['webzine','phone'],
+  ['phone','faith'],['phone','log'],['phone','piano'],['phone','psycare'],
+];
+
+// Init positions in a circle
+nodes.forEach((n,i)=>{
+  if(n.type==='center'){ n.x=W/2; n.y=H/2; }
+  else if(n.type==='tool'){ const a=(i-1)/(6)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*140; n.y=H/2+Math.sin(a)*140; }
+  else { const a=(i-7)/(5)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*240; n.y=H/2+Math.sin(a)*240; }
+});
+
+function resize(){
+  const rect = container.getBoundingClientRect();
+  W = rect.width; H = rect.height;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
+
+// Force simulation
+function simulate(){
+  const center = nodes[0];
+  center.x += (W/2 - center.x) * 0.08;
+  center.y += (H/2 - center.y) * 0.08;
+
+  // Repulsion between all nodes
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i], b=nodes[j];
+      const dx=b.x-a.x, dy=b.y-a.y, dist=Math.max(Math.hypot(dx,dy),1);
+      const force = 800 / (dist*dist);
+      const fx=dx/dist*force, fy=dy/dist*force;
+      if(a.type!=='center'||dragNode!==a){ a.x-=fx; a.y-=fy; }
+      if(b.type!=='center'||dragNode!==b){ b.x+=fx; b.y+=fy; }
+    }
+  }
+
+  // Edge attraction
+  for(const [aId,bId] of edges){
+    const a=nodes.find(n=>n.id===aId), b=nodes.find(n=>n.id===bId);
+    const dx=b.x-a.x, dy=b.y-a.y, dist=Math.hypot(dx,dy);
+    const target = a.type==='center' ? 130 : b.type==='eco' ? 120 : 100;
+    const force = (dist-target)*0.003;
+    const fx=dx/dist*force, fy=dy/dist*force;
+    if(a.type!=='center'||dragNode!==a){ a.x+=fx; a.y+=fy; }
+    if(b.type!=='center'||dragNode!==b){ b.x-=fx; b.y-=fy; }
+  }
+
+  // Drag
+  if(dragNode){ dragNode.x=mouseX; dragNode.y=mouseY; }
+
+  // Contain
+  for(const n of nodes){
+    if(n===dragNode) continue;
+    n.x=Math.max(n.r,Math.min(W-n.r,n.x));
+    n.y=Math.max(n.r,Math.min(H-n.r,n.y));
+  }
+}
+
+// Particles along edges
+function spawnParticles(){
+  for(const [aId,bId] of edges){
+    if(Math.random()>0.3) continue;
+    const a=nodes.find(n=>n.id===aId), b=nodes.find(n=>n.id===bId);
+    const t=Math.random();
+    const x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t;
+    particles.push({x,y,life:1, a:aId, b:bId});
+  }
+  particles=particles.filter(p=>{p.life-=0.015; return p.life>0;});
+}
+
+// Render
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Glow for hovered node
+  if(hoverNode){
+    const g=ctx.createRadialGradient(hoverNode.x,hoverNode.y,0,hoverNode.x,hoverNode.y,hoverNode.r*3);
+    g.addColorStop(0,hoverNode.glow); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(hoverNode.x,hoverNode.y,hoverNode.r*3,0,Math.PI*2); ctx.fill();
+  }
+
+  // Edges
+  const connectedEdges = hoverNode ? edges.filter(([a,b])=>a===hoverNode.id||b===hoverNode.id) : [];
+  const connectedIds = hoverNode ? new Set(connectedEdges.flat()) : new Set();
+
+  for(const [aId,bId] of edges){
+    const a=nodes.find(n=>n.id===aId), b=nodes.find(n=>n.id===bId);
+    const alpha = hoverNode ? (connectedIds.has(aId)&&connectedIds.has(bId) ? 0.8 : 0.06) : 0.25;
+    ctx.strokeStyle = hoverNode && connectedIds.has(aId) && connectedIds.has(bId)
+      ? (a.color===b.color ? a.color : '#c9a84c')
+      : `rgba(255,255,255,${alpha})`;
+    ctx.lineWidth = hoverNode && connectedIds.has(aId) && connectedIds.has(bId) ? 1.5 : 0.5;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+
+  // Particles (only on highlighted edges)
+  for(const p of particles){
+    if(hoverNode && !connectedIds.has(p.a) && !connectedIds.has(p.b)) continue;
+    const a=nodes.find(n=>n.id===p.a), b=nodes.find(n=>n.id===p.b);
+    const x=a.x+(b.x-a.x)*0.5, y=a.y+(b.y-a.y)*0.5;
+    ctx.fillStyle=`rgba(201,168,76,${p.life*0.6})`; ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+  }
+
+  // Nodes
+  for(const n of nodes){
+    const alpha = hoverNode ? (n===hoverNode||connectedIds.has(n.id) ? 1 : 0.3) : 1;
+    ctx.globalAlpha = alpha;
+
+    // Outer ring
+    if(n===hoverNode){
+      ctx.strokeStyle=n.glow; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r+4,0,Math.PI*2); ctx.stroke();
+    }
+
+    // Node body
+    const grad=ctx.createRadialGradient(n.x-n.r*0.2,n.y-n.r*0.3,n.r*0.1,n.x,n.y,n.r);
+    grad.addColorStop(0,'rgba(30,30,30,1)'); grad.addColorStop(1,'rgba(13,13,13,1)');
+    ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=n===hoverNode?n.color:n.color+'55'; ctx.lineWidth=n===hoverNode?2:1;
+    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.stroke();
+
+    // Label
+    ctx.fillStyle=n===hoverNode?'#fff':'#ccc';
+    ctx.font = `${n.type==='center'?11:9}px Inter,Noto Sans KR,sans-serif`;
+    ctx.textAlign='center';
+    ctx.fillText(n.label, n.x, n.y+n.r+16);
+    if(n.sub){
+      ctx.fillStyle=n===hoverNode?n.color:'#666';
+      ctx.font='8px Inter,Noto Sans KR,sans-serif';
+      ctx.fillText(n.sub, n.x, n.y+n.r+28);
+    }
+
+    ctx.globalAlpha=1;
+  }
+}
+
+// Tooltip
+function updateTooltip(e){
+  if(!hoverNode||hoverNode.type==='center'){ tooltip.style.opacity='0'; return; }
+  const rect=container.getBoundingClientRect();
+  tooltip.innerHTML=`<div class="name">${hoverNode.label}</div><div class="desc">${hoverNode.desc}</div>`;
+  tooltip.style.left=(e.clientX-rect.left+15)+'px';
+  tooltip.style.top=(e.clientY-rect.top-40)+'px';
+  tooltip.style.opacity='1';
+}
+
+// Mouse events
+container.addEventListener('mousemove',(e)=>{
+  const rect=container.getBoundingClientRect();
+  mouseX=e.clientX-rect.left; mouseY=e.clientY-rect.top;
+  if(dragNode){ dragNode.x=mouseX; dragNode.y=mouseY; return; }
+
+  hoverNode=null;
+  for(const n of nodes){
+    if(Math.hypot(mouseX-n.x,mouseY-n.y)<n.r+8){ hoverNode=n; break; }
+  }
+  container.style.cursor=hoverNode&&hoverNode.type!=='center'?'pointer':hoverNode?'default':'grab';
+  updateTooltip(e);
+});
+
+container.addEventListener('mousedown',(e)=>{
+  if(hoverNode&&hoverNode.type!=='center'){ dragNode=hoverNode; container.style.cursor='grabbing'; }
+});
+
+container.addEventListener('mouseup',()=>{ dragNode=null; });
+container.addEventListener('mouseleave',()=>{ hoverNode=null; dragNode=null; tooltip.style.opacity='0'; });
+
+// Touch
+container.addEventListener('touchmove',(e)=>{
+  e.preventDefault();
+  const rect=container.getBoundingClientRect();
+  mouseX=e.touches[0].clientX-rect.left; mouseY=e.touches[0].clientY-rect.top;
+  if(dragNode){ dragNode.x=mouseX; dragNode.y=mouseY; return; }
+  hoverNode=null;
+  for(const n of nodes){ if(Math.hypot(mouseX-n.x,mouseY-n.y)<n.r+8){ hoverNode=n; break; } }
+},{passive:false});
+
+container.addEventListener('touchstart',(e)=>{
+  if(hoverNode&&hoverNode.type!=='center'){ dragNode=hoverNode; }
+});
+
+container.addEventListener('touchend',()=>{ dragNode=null; });
+
+// ── Loop ──
+function loop(){
+  for(let i=0;i<3;i++) simulate();
+  if(Math.random()<0.5) spawnParticles();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+resize();
+window.addEventListener('resize',resize);
+loop();
 </script>
 </body>
 </html>
