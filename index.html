@@ -179,13 +179,6 @@ const edges = [
   ['phone','faith'],['phone','log'],['phone','piano'],['phone','psycare'],
 ];
 
-// Init positions in a circle
-nodes.forEach((n,i)=>{
-  if(n.type==='center'){ n.x=W/2; n.y=H/2; }
-  else if(n.type==='tool'){ const a=(i-1)/(6)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*140; n.y=H/2+Math.sin(a)*140; }
-  else { const a=(i-7)/(5)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*240; n.y=H/2+Math.sin(a)*240; }
-});
-
 function resize(){
   const rect = container.getBoundingClientRect();
   W = rect.width; H = rect.height;
@@ -195,6 +188,14 @@ function resize(){
   canvas.style.height = H+'px';
   ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
+resize();
+
+// Init positions in a circle
+nodes.forEach((n,i)=>{
+  if(n.type==='center'){ n.x=W/2; n.y=H/2; }
+  else if(n.type==='tool'){ const a=(i-1)/(6)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*140; n.y=H/2+Math.sin(a)*140; }
+  else { const a=(i-7)/(5)*Math.PI*2 - Math.PI/2; n.x=W/2+Math.cos(a)*240; n.y=H/2+Math.sin(a)*240; }
+});
 
 // Force simulation
 function simulate(){
@@ -369,8 +370,10 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
-resize();
-window.addEventListener('resize',resize);
+window.addEventListener('resize',()=>{
+  resize();
+  nodes[0].x=W/2; nodes[0].y=H/2;
+});
 loop();
 </script>
 </body>
