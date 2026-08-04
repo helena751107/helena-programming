@@ -1,21 +1,17 @@
 {
-  "name": "Helena Studio — 웹페이지→영상",
-  "short_name": "Helena Studio",
-  "start_url": "./",
+  "name": "Helena Programming — 생각의 서식",
+  "short_name": "Programming",
+  "description": "에이전트를 위한 인스트럭션 + MCP 도구 앱스토어",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#6366f1",
-  "description": "웹페이지 URL → TTS + 스크린샷 → MP4 영상 자동 생성. S21 단독, 0원.",
+  "background_color": "#0a0908",
+  "theme_color": "#c9a84c",
   "icons": [
     {
-      "src": "assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "assets/icon-512.png",
+      "src": "/assets/favicon.svg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
