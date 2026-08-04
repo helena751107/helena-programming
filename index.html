@@ -4,17 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="alternate icon" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#c9a84c">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Helena Programming — 생각의 서식</title>
+<link rel="alternate icon" href="/favicon.svg">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c9a84c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<title>Helena Programming — 생각의 서식</title>
 <style>
 :root{
   --bg:#0a0908; --surface:#141312; --text:#e8e6e3; --muted:#8b8680;
   --gold:#c9a84c; --teal:#2ec4b6; --radius:12px;
-  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  --font:'DM Sans','Noto Sans KR',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6}
@@ -49,7 +52,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .tag{font-size:.7rem;padding:2px 8px;border-radius:10px;background:#1a1a1a;color:var(--muted)}
 .tag.gold{background:rgba(201,168,76,.15);color:var(--gold)}
 .tag.teal{background:rgba(46,196,182,.15);color:var(--teal)}
-.app-card .install{font-size:.75rem;font-family:monospace;color:var(--teal);background:#0a0f0e;padding:.4rem .8rem;border-radius:6px;display:inline-block}
+.app-card .install{font-size:.75rem;font-family:var(--mono);color:var(--teal);background:#0a0f0e;padding:.4rem .8rem;border-radius:6px;display:inline-block}
 
 /* Pipe Flow */
 .pipe-diagram{background:var(--surface);border-radius:var(--radius);padding:2rem;margin:2rem 0}
@@ -58,7 +61,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .pipe-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
 .pipe-info{flex:1}
 .pipe-name{font-weight:700;font-size:.9rem}
-.pipe-cmd{font-size:.75rem;color:var(--teal);font-family:monospace;margin-top:.2rem}
+.pipe-cmd{font-size:.75rem;color:var(--teal);font-family:var(--mono);margin-top:.2rem}
 .pipe-arrow{color:var(--gold);font-size:1.2rem;text-align:center;padding:.1rem 0}
 
 .ecosystem{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin:2rem 0}
