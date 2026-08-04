@@ -2,372 +2,184 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>냉장고(Fridge) 아키텍처 — dtslib1979 ⇄ helena751107 자산 공유 체계</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Helena Programming — 도구·엔진·파이프라인</title>
 <style>
 :root{
-  --bg:#050510; --bg2:#0a0a20; --surface:rgba(255,255,255,0.03);
-  --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.1);
-  --text:#e8e8f0; --text2:rgba(255,255,255,0.65); --text3:rgba(255,255,255,0.35);
-  --accent:#818cf8; --accent2:#6366f1; --accent-glow:rgba(99,102,241,0.3);
-  --gold:#f59e0b; --gold-glow:rgba(245,158,11,0.2);
-  --green:#34d399; --red:#f87171; --pink:#f472b6; --cyan:#22d3ee;
-  --font:'Inter','Noto Sans KR',system-ui,sans-serif;
-  --transition:0.5s cubic-bezier(0.16,1,0.3,1);
+  --bg:#0a0908; --surface:#141312; --text:#e8e6e3; --muted:#8b8680;
+  --gold:#c9a84c; --teal:#2ec4b6; --red:#e63946; --radius:12px;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;height:100vh}
-body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6}
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,9,8,0.9);backdrop-filter:blur(10px);padding:.8rem 2rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a1a1a}
+.nav-logo{font-weight:900;color:var(--gold)}
+.nav-links{display:flex;gap:1.5rem;font-size:.85rem}
+.nav-links a{color:var(--muted);text-decoration:none;transition:color .3s}
+.nav-links a:hover{color:var(--text)}
 
-/* 배경 파티클 */
-.bg-particles{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-.bg-particles .orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.08;animation:float 20s infinite ease-in-out}
-.bg-particles .orb:nth-child(1){width:600px;height:600px;background:var(--accent);top:-200px;left:-100px;animation-delay:0s}
-.bg-particles .orb:nth-child(2){width:400px;height:400px;background:var(--pink);bottom:-100px;right:-100px;animation-delay:-7s}
-.bg-particles .orb:nth-child(3){width:500px;height:500px;background:var(--cyan);top:50%;left:50%;animation-delay:-14s}
-@keyframes float{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(100px,-50px) scale(1.1)}50%{transform:translate(-50px,100px) scale(0.9)}75%{transform:translate(-100px,-100px) scale(1.05)}}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}
+.hero-chip{background:var(--teal);color:var(--bg);padding:4px 14px;border-radius:20px;font-size:.8rem;font-weight:700;letter-spacing:.1em;margin-bottom:1.5rem}
+.hero h1{font-size:clamp(2rem,6vw,4rem);line-height:1.15;margin-bottom:1rem}
+.hero h1 span{color:var(--gold)}
+.hero p{color:var(--muted);max-width:500px;margin-bottom:2rem}
+.hero-stats{display:flex;gap:2rem;flex-wrap:wrap;justify-content:center}
+.stat{text-align:center}
+.stat-val{font-size:2rem;font-weight:900;color:var(--teal)}
+.stat-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
 
-/* 내비게이션 바 */
-.navbar{position:fixed;top:0;left:0;right:0;z-index:100;padding:1rem 1.5rem;
-  background:rgba(5,5,16,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}
-.navbar .logo{font-weight:800;font-size:1rem;letter-spacing:-0.02em;flex:1}
-.navbar .logo span{color:var(--accent)}
-.nav-dots{display:flex;gap:6px}
-.nav-dot{width:10px;height:10px;border-radius:50%;background:var(--border2);cursor:pointer;transition:all 0.3s;position:relative}
-.nav-dot.active{background:var(--accent);box-shadow:0 0 12px var(--accent-glow);transform:scale(1.2)}
-.nav-dot.done{background:var(--green)}
-.nav-btn{padding:.5rem 1rem;border:1px solid var(--border2);border-radius:8px;
-  background:rgba(255,255,255,0.03);color:var(--text);cursor:pointer;
-  font-size:.8rem;font-weight:500;transition:all 0.2s;font-family:var(--font)}
-.nav-btn:hover{border-color:var(--accent);background:rgba(99,102,241,0.1)}
-.nav-btn.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
-.nav-btn.primary:hover{background:var(--accent);box-shadow:0 0 20px var(--accent-glow)}
-.nav-btn.primary.playing{background:#dc2626;border-color:#dc2626}
+.section{max-width:900px;margin:0 auto;padding:4rem 2rem}
+.section h2{font-size:2rem;margin-bottom:1.5rem;border-left:4px solid var(--gold);padding-left:1rem}
 
-/* 섹션 */
-.slide{min-height:100vh;display:flex;align-items:center;justify-content:center;
-  padding:5rem 2rem 3rem;position:relative;z-index:1;
-  scroll-snap-align:start;scroll-snap-stop:always}
-.slide-inner{width:100%;max-width:900px}
-.slide-num{font-size:.75rem;font-weight:600;letter-spacing:0.15em;color:var(--accent);
-  text-transform:uppercase;margin-bottom:1rem}
-.slide h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.2;
-  letter-spacing:-0.03em;margin-bottom:2rem;background:linear-gradient(135deg,var(--text) 0%,var(--text2) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.slide h2 .hl{color:var(--accent);-webkit-text-fill-color:var(--accent)}
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin:2rem 0}
+.tool-card{background:var(--surface);border-radius:var(--radius);padding:1.5rem;transition:all .3s;border:2px solid transparent}
+.tool-card:hover{border-color:var(--gold)}
+.tool-card .icon{font-size:2rem;margin-bottom:.8rem}
+.tool-card h3{margin-bottom:.3rem}
+.tool-card .desc{font-size:.85rem;color:var(--muted);margin-bottom:.8rem}
+.tool-card .tags{display:flex;gap:.3rem;flex-wrap:wrap}
+.tag{font-size:.7rem;padding:2px 8px;border-radius:10px;background:#1a1a1a;color:var(--muted)}
+.tag.gold{background:rgba(201,168,76,.15);color:var(--gold)}
+.tag.teal{background:rgba(46,196,182,.15);color:var(--teal)}
 
-/* 글래스 카드 */
-.glass{background:var(--surface);border:1px solid var(--border);border-radius:20px;
-  padding:2rem;margin-bottom:1rem;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  transition:all 0.3s}
-.glass:hover{border-color:var(--border2);background:rgba(255,255,255,0.04)}
-.glass p{font-size:1.05rem;line-height:1.75;color:var(--text2);margin-bottom:.75rem}
-.glass p:last-child{margin-bottom:0}
+.pipe-diagram{background:var(--surface);border-radius:var(--radius);padding:2rem;margin:2rem 0}
+.pipe-row{display:flex;align-items:center;gap:1rem;padding:.6rem 1rem;margin:.2rem 0;border-radius:8px;transition:all .3s;border:1px solid transparent}
+.pipe-row:hover{border-color:var(--gold);background:#1a1816}
+.pipe-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.pipe-info{flex:1}
+.pipe-name{font-weight:700;font-size:.9rem}
+.pipe-cmd{font-size:.75rem;color:var(--teal);font-family:monospace;margin-top:.2rem}
+.pipe-arrow{color:var(--gold);font-size:1.2rem;text-align:center;padding:.1rem 0}
 
-/* 아코디언 */
-.accordion{margin-bottom:.5rem;border-radius:14px;overflow:hidden;
-  background:var(--surface);border:1px solid var(--border);transition:all 0.3s}
-.accordion-header{padding:1.2rem 1.5rem;cursor:pointer;display:flex;
-  align-items:center;justify-content:space-between;user-select:none;
-  font-weight:600;font-size:1rem;transition:all 0.2s}
-.accordion-header:hover{background:rgba(255,255,255,0.02)}
-.accordion-arrow{font-size:.7rem;transition:transform 0.3s;color:var(--text3)}
-.accordion.open .accordion-arrow{transform:rotate(180deg);color:var(--accent)}
-.accordion-body{max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}
-.accordion.open .accordion-body{max-height:2000px;padding:0 1.5rem 1.5rem}
-.accordion-body p{font-size:.95rem;line-height:1.7;color:var(--text2)}
+.ecosystem{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.8rem;margin:2rem 0}
+.eco-item{background:var(--surface);border-radius:var(--radius);padding:1rem;text-align:center;transition:all .3s;border:2px solid transparent;text-decoration:none;color:var(--text)}
+.eco-item:hover{border-color:var(--gold)}
+.eco-item .icon{font-size:1.5rem;margin-bottom:.3rem}
+.eco-item h4{font-size:.9rem}
+.eco-item .role{font-size:.7rem;color:var(--muted)}
 
-/* 인포그래픽 그리드 */
-.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:1.5rem 0}
-.info-tile{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.02));
-  border:1px solid var(--border);border-radius:16px;padding:1.5rem;text-align:center;
-  transition:all 0.3s;position:relative;overflow:hidden}
-.info-tile::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity 0.3s}
-.info-tile:hover{border-color:var(--accent);transform:translateY(-2px)}
-.info-tile:hover::before{opacity:1}
-.info-tile .val{font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,var(--accent),#c084fc);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.info-tile .lbl{font-size:.75rem;color:var(--text3);margin-top:.4rem;font-weight:500}
+.callout{background:linear-gradient(135deg,#1a1810,#141312);border:1px solid var(--gold);border-radius:var(--radius);padding:1.5rem;margin:2rem 0}
+.callout strong{color:var(--gold)}
 
-/* 하이라이트 카드 */
-.hl-card{background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.01));
-  border:1px solid rgba(245,158,11,0.15);border-radius:16px;padding:1.5rem;margin:1rem 0}
-.hl-card .icon{font-size:1.5rem;margin-bottom:.5rem}
-.hl-card p{font-size:.95rem;line-height:1.7;color:var(--text2)}
-.hl-card strong{color:var(--gold)}
-
-/* 테이블 */
-.table-glass{overflow-x:auto;margin:1rem 0;border-radius:14px;border:1px solid var(--border)}
-.table-glass table{width:100%;border-collapse:collapse;font-size:.9rem}
-.table-glass th{background:rgba(99,102,241,0.15);color:var(--accent);padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em}
-.table-glass td{padding:.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text2)}
-.table-glass tr:last-child td{border-bottom:none}
-.table-glass tr:hover td{background:rgba(255,255,255,0.02)}
-
-/* 리스트 */
-.glass-list{list-style:none}
-.glass-list li{padding:.8rem 1rem;margin:.3rem 0;border-left:2px solid var(--accent);
-  background:rgba(99,102,241,0.03);border-radius:0 8px 8px 0;font-size:.9rem;color:var(--text2);transition:all 0.2s}
-.glass-list li:hover{border-left-width:4px;background:rgba(99,102,241,0.06)}
-
-/* 다이어그램 */
-.mermaid-glass{background:rgba(255,255,255,0.98);border-radius:14px;padding:1.5rem;margin:1rem 0;overflow-x:auto}
-
-/* 코드 */
-.code-glass{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:1.2rem;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.8rem;color:#a6adc8;line-height:1.6;margin:1rem 0}
-
-/* TTS 인디케이터 */
-.tts-badge{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:200;
-  background:var(--accent2);color:#fff;padding:.6rem 1.8rem;border-radius:30px;
-  font-size:.85rem;font-weight:600;display:none;box-shadow:0 8px 30px var(--accent-glow);
-  animation:pulse 1.5s infinite;letter-spacing:-0.01em}
-.tts-badge.on{display:block}
-@keyframes pulse{0%,100%{opacity:1;transform:translateX(-50%) scale(1)}50%{opacity:.85;transform:translateX(-50%) scale(1.03)}}
-
-/* 진행바 */
-.progress-fixed{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc);z-index:200;transition:width 0.5s ease;border-radius:0 2px 2px 0}
-
-/* 반응형 */
-@media(max-width:768px){
-  .slide{padding:4rem 1rem 2rem}
-  .glass{padding:1.25rem}
-  .info-grid{grid-template-columns:repeat(2,1fr)}
-  .navbar{padding:.75rem 1rem;gap:.5rem}
-  .nav-btn{padding:.4rem .7rem;font-size:.7rem}
-}
+@media(max-width:600px){.hero-stats{gap:1rem}.tool-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<div class="bg-particles">
-  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
-</div>
-<div class="progress-fixed" id="progressBar" style="width:0%"></div>
-<div class="navbar">
-  <div class="logo">🎬 <span>Helena</span> Studio</div>
-  <div class="nav-dots" id="navDots"></div>
-  <button class="nav-btn primary" id="playBtn" onclick="togglePlay()">▶ Play All</button>
-  <button class="nav-btn" onclick="exportVideo()">📥 저장</button>
-</div>
-<div class="tts-badge" id="ttsBadge">🔊 읽는 중...</div>
+<nav class="nav">
+  <span class="nav-logo">HELENA PROGRAMMING</span>
+  <div class="nav-links">
+    <a href="https://helena751107.github.io/helena_phone/">📡 Phone</a>
+    <a href="https://github.com/helena751107/helena-programming">GitHub</a>
+  </div>
+</nav>
 
-<div id="slides"></div>
+<section class="hero">
+  <div class="hero-chip">TOOLBOX</div>
+  <h1>반복을<br><span>엔진</span>으로</h1>
+  <p>MCP 서버, CLI 파이프라인, 자동화 엔진.<br>한 번 만들고 계속 돌리는 도구 상자.</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-val">6</div><div class="stat-label">핵심 도구</div></div>
+    <div class="stat"><div class="stat-val">18</div><div class="stat-label">MCP 툴</div></div>
+    <div class="stat"><div class="stat-val">L0-L9</div><div class="stat-label">사다리</div></div>
+    <div class="stat"><div class="stat-val">24편</div><div class="stat-label">시리즈</div></div>
+  </div>
+</section>
 
-<script>
-const SECTIONS = [{"title": "냉장고(Fridge) 아키텍처 — dtslib1979 ⇄ helena751107 자산 공유 체계", "blocks": [{"type": "p", "content": "> 선언: 2026-07-31 (Claude, Boss 승인) > 헌법 근거: CONSTITUTION.md 제2조(코드는 선물) · 제6조(판단력=희소자산) > 관계 문서: 99-devlog.md §97–98"}]}, {"title": "1. 정의", "blocks": [{"type": "p", "content": "냉장고(Fridge) 란, dtslib1979(창작자)가 구축한 모든 코드·에셋·실험·템플릿을 helena751107(수혜자·누나·대필작가)에게 GitHub 콜라보레이터 권한으로 즉시 공유하는 자산 전달 체계다."}, {"type": "p", "content": "포크도, PR도, 서브모듈도 아니다. 공동 소유(shared ownership) 다."}]}, {"title": "2. 냉장고에 들어 있는 것", "blocks": []}, {"title": "dtslib1979 소유 — 28종 (27🔒 + 1🌐)", "blocks": [{"type": "table", "content": "| 레포 | 내용 | 핵심 자산 |\n|------|------|-----------|\n| `dtslib-papyrus` | 디지털 명함·선물 패키지 원산지 | 33파일·9,240줄 — CONSTITUTION 제2조의 실물 증거 |\n| `dtslib-branch` | 보일러플레이트 + 실물 모델 | 브랜치 전략·템플릿 |\n| `dtslib-cloud-appstore` | 클라우드 앱 배포 실험 (Python) | 배포 파이프라인 |\n| `dtslib-localpc` | 로컬PC 실행 노드 (Python) | WSL·로컬 자동화·오프라인 워크플로우 |\n| `dtslib-apk-lab` | APK 빌드 실험실 (Dart) 🌐 | 안드로이드 패키징 |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `gohsy` | gohsy comes true — 브랜드 루트 |\n| `gohsy-fashion` | DONGSEON Studio — 비즈니스 디지털 스튜디오 |\n| `gohsy-production` | 3-Lane 방송 스튜디오 프로토콜 (News/Recording/Stage) |\n| `espiritu-tango` | Tango Magenta — 콘텐츠 방송 아키텍처 |\n| `artrew` | KOOSY 자매 사이트 |\n| `koosy` | 셀럽 스토리 편집 방송 ⭐2 |"}, {"type": "table", "content": "| 레포 | 내용 | 규모/특징 |\n|------|------|-----------|\n| `parksy-audio` | 오디오·내레이션·MIDI 추출·렌더링 | ~986MB, steal.py→demucs→basic-pitch 파이프, TG 봇(36KB) |\n| `parksy-image` | 썸네일·AI 비디오 시드 | WH 연동 |\n| `parksy-logs` | Android Share Intent → 자동 텍스트 캡처 | Python, 개인 아카이브 |\n| `parksy.kr` | EduArt 엔지니어 마도서 — 디지털 지식 아카이브 | |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `termux-bridge` | **PC↔Termux 간극 메우기** — QA·CDP 스크린샷·모바일 개발 |\n| `OrbitPrompt` | 다중 쿼리 생성 엔진 → AI 파이프 |\n| `eae-univ` | AI 시대 온라인 학습 플랫폼 — YouTube + PWA |\n| `eae.kr` | EAE PWA Books — React + Vite + MDX + Pages ⭐1 |"}, {"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `abraham` | 에이브럼 — 족발집 실운영자 + YouTube 크리에이터 |\n| `papafly` | 파파플라이 인큐베이션 |\n| `buckleychang.com` | Buckley Chang CPA — AI 경제 리얼리티 인터페이스 |\n| `buddies.kr` | 실물 유통·지역 비즈니스 |\n| `namoneygoal` | 길드형 부동산·로컬 비즈니스 실험 |\n| `phoneparis` | 폰 유통·현장 판매 실험 |\n| `hoyadang.com` | 레스토랑 프로토콜 (espiritu-tango fork) |\n| `alexandria-sanctuary` | 팔공산 글로벌 스피리추얼 케어 커뮤니티 |\n| `dtslib.kr` | DTSLIB 경제방송 허브 — 코드·사업·현장 연결 |"}]}, {"title": "helena751107 소유 — 6종 (전부 🌐)", "blocks": [{"type": "table", "content": "| 레포 | 내용 |\n|------|------|\n| `helena_phone` | **메인 워크스페이스** — S21 폰·Termux·AI 에이전트·문서 |\n| `helana_log` | 기술 로그 — APK 리버싱·MCP·LLM |\n| `helena-faith` | 가족 신앙사 — 신학·묵상·찬양 아카이브 |\n| `helena-piano` | 피아노 종합 — MIDI·REAPER·AI 음원·BGM Studio |\n| `helena-psycare` | 멘탈케어 — 정신분석·MCP 모델·치료 기록 |\n| `helana-faith` | (중복 가능성 — ecosystem-map 미등록) |"}]}, {"title": "3. 냉장고 vs 기존 협업 모델", "blocks": [{"type": "table", "content": "| | Fork | PR | Submodule | **냉장고 (콜라보)** |\n|---|---|---|---|---|\n| 방향 | 단방향 복사 | 단방향 제안 | 읽기전용 참조 | **쌍방향 RW** |\n| 원본 접근 | 내 사본만 | merge 후 | 고정 커밋 | **실시간 최신** |\n| AI가 쓰려면 | fork 따로 clone | PR 따로 생성 | submodule init | **바로 `gh repo clone`** |\n| 자산 철학 | \"빌려 씀\" | \"기여함\" | \"참조함\" | **\"내 것도 네 것\"** |\n| 갱신 | upstream pull | merge 기다림 | 수동 업데이트 | **즉시 반영** |"}]}, {"title": "4. AI 에이전트가 냉장고를 쓰는 패턴", "blocks": []}, {"title": "4.1 재고 확인", "blocks": [{"type": "code", "content": "# 전체 28종 인벤토리\ngh api /user/repos \\\n  --jq '[.[] | select(.owner.login == \"dtslib1979\")] | .[] | \"\\(.name) | \\(.description)\"'", "lang": "bash"}]}, {"title": "4.2 특정 자산 즉시 복제", "blocks": [{"type": "code", "content": "# termux-bridge 필요하면:\ngh repo clone dtslib1979/termux-bridge /root/fridge/termux-bridge\n\n# parksy-audio 파이프 필요하면:\ngh repo clone dtslib1979/parksy-audio /root/fridge/parksy-audio", "lang": "bash"}]}, {"title": "4.3 파일 단위 참조 (clone 없이)", "blocks": [{"type": "code", "content": "# README만 읽기\ngh api repos/dtslib1979/parksy-audio/contents/README.md --jq '.content' | base64 -d\n\n# 특정 디렉토리 구조 파악\ngh api repos/dtslib1979/termux-bridge/contents/app/ --jq '.[].name'", "lang": "bash"}]}, {"title": "4.4 전체 싱크 (최초 1회)", "blocks": [{"type": "code", "content": "mkdir -p /root/fridge\nfor r in $(gh api /user/repos --jq '[.[]|select(.owner.login==\"dtslib1979\")].name[]'); do\n  [ -d \"/root/fridge/$r\" ] && git -C \"/root/fridge/$r\" pull --ff-only \\\n    || gh repo clone \"dtslib1979/$r\" \"/root/fridge/$r\"\ndone", "lang": "bash"}]}, {"title": "5. 헌법적 의미", "blocks": []}];
-let idx=0,playing=false;
+<section class="section">
+  <h2>핵심 도구</h2>
+  <div class="tool-grid">
+    <div class="tool-card">
+      <div class="icon">🎬</div>
+      <h3>Director / perfect_ship</h3>
+      <div class="desc">제품 투어 영상 자동화. Playwright 촬영 → ffmpeg 합성 → Vision QA → SHIP. L0~L9 사다리.</div>
+      <div class="tags"><span class="tag gold">영상</span><span class="tag teal">CLI</span><span class="tag">Playwright</span></div>
+    </div>
+    <div class="tool-card">
+      <div class="icon">📸</div>
+      <h3>auto_image_pipe</h3>
+      <div class="desc">사진 → 영상 → TG 자동. inotifywait 감시. ffmpeg 슬라이드쇼. 터치 0회.</div>
+      <div class="tags"><span class="tag gold">영상</span><span class="tag teal">CLI</span><span class="tag">inotify</span></div>
+    </div>
+    <div class="tool-card">
+      <div class="icon">🎙️</div>
+      <h3>episode_produce</h3>
+      <div class="desc">시리즈 에피소드 제작 표준 파이프. 스크린샷→TTS→ffmpeg→TG. 4단계 고정.</div>
+      <div class="tags"><span class="tag gold">영상</span><span class="tag teal">CLI</span><span class="tag">edge-tts</span></div>
+    </div>
+    <div class="tool-card">
+      <div class="icon">🔌</div>
+      <h3>phone-mcp-server</h3>
+      <div class="desc">18개 폰 제어 도구. SMS·카메라·클립보드·알림. stdio 전환 예정.</div>
+      <div class="tags"><span class="tag teal">MCP</span><span class="tag">Node.js</span></div>
+    </div>
+    <div class="tool-card">
+      <div class="icon">🏥</div>
+      <h3>phone-health</h3>
+      <div class="desc">27개 항목 건강 검진. 배터리·저장소·네트워크. Grade A/B/C. TG 보고.</div>
+      <div class="tags"><span class="tag teal">CLI</span><span class="tag">bash</span></div>
+    </div>
+    <div class="tool-card">
+      <div class="icon">📝</div>
+      <h3>webzine builder</h3>
+      <div class="desc">_notebook/*.md → notebook/*.html. 공통 UI·검색·접기·펼치기·복사.</div>
+      <div class="tags"><span class="tag teal">CLI</span><span class="tag">Python</span></div>
+    </div>
+  </div>
+</section>
 
-mermaid.initialize({startOnLoad:false,theme:'base',themeVariables:{primaryColor:'#818cf8',primaryTextColor:'#1e1b4b',primaryBorderColor:'#6366f1',lineColor:'#6366f1',secondaryColor:'#f0abfc',tertiaryColor:'#e0e7ff'}});
+<section class="section">
+  <h2>작업 파이프</h2>
+  <div class="pipe-diagram">
+    <div class="pipe-row">
+      <div class="pipe-icon" style="background:#1a1a2e">👤</div>
+      <div class="pipe-info"><div class="pipe-name">Boss 명령</div><div class="pipe-cmd">"이거 만들어" — 짧은 프롬프트</div></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-icon" style="background:#0d1b0d">🛡️</div>
+      <div class="pipe-info"><div class="pipe-name">Claude Code (DeepSeek)</div><div class="pipe-cmd">판단 → 도구 선택 → 실행</div></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-icon" style="background:#1a1010">🔧</div>
+      <div class="pipe-info"><div class="pipe-name">도구 실행</div><div class="pipe-cmd">python3 perfect_ship.py · bash auto_image_pipe.sh · git push</div></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-icon" style="background:#1a1a10">📤</div>
+      <div class="pipe-info"><div class="pipe-name">결과 배달</div><div class="pipe-cmd">TG 전송 · GitHub Pages · YouTube 업로드</div></div>
+    </div>
+  </div>
+</section>
 
-document.addEventListener('DOMContentLoaded',()=>{
-  renderSlides();
-  renderNavDots();
-  updateNav();
-  // 초기 섹션 visible 감지
-  const obs=new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{if(e.isIntersecting){
-      const i=parseInt(e.target.dataset.index);
-      if(i!==idx){idx=i;updateNav();}
-    }});
-  },{threshold:0.5});
-  document.querySelectorAll('.slide').forEach(s=>obs.observe(s));
-});
+<section class="section">
+  <h2>6개 레포 생태계</h2>
+  <div class="ecosystem">
+    <a href="https://helena751107.github.io/helena_phone/" class="eco-item">
+      <div class="icon">📡</div><h4>helena_phone</h4><div class="role">포털·웹진</div>
+    </a>
+    <a href="https://helena751107.github.io/helana-faith/" class="eco-item">
+      <div class="icon">✝️</div><h4>helana-faith</h4><div class="role">신앙 콘텐츠</div>
+    </a>
+    <a href="https://helena751107.github.io/helana_log/" class="eco-item">
+      <div class="icon">📝</div><h4>helana_log</h4><div class="role">학습 로그</div>
+    </a>
+    <a href="https://helena751107.github.io/helena-piano/" class="eco-item">
+      <div class="icon">🎹</div><h4>helena-piano</h4><div class="role">연주 스튜디오</div>
+    </a>
+    <a href="https://helena751107.github.io/helena-psycare/" class="eco-item">
+      <div class="icon">🛡️</div><h4>helena-psycare</h4><div class="role">돌봄 허브</div>
+    </a>
+    <div class="eco-item" style="border-color:var(--gold)">
+      <div class="icon">🔧</div><h4>programming</h4><div class="role" style="color:var(--gold)">← 도구·엔진</div>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>이 레포의 역할:</strong> 콘텐츠를 만들지 않는다. <span style="color:var(--teal)">콘텐츠를 만드는 도구</span>를 만든다.<br>
+    Director, auto_image_pipe, episode_produce, MCP 서버 — 반복 작업을 엔진으로.
+  </div>
+</section>
 
-function renderSlides(){
-  document.getElementById('slides').innerHTML=SECTIONS.map((s,i)=>{
-    let html=`<section class="slide" data-index="${i}"><div class="slide-inner">`;
-    html+=`<div class="slide-num">Section ${i+1} / ${SECTIONS.length}</div>`;
-    html+=`<h2>${esc(s.title)}</h2>`;
-
-    // 블록 렌더링
-    let accordionIdx=0;
-    for(const b of s.blocks){
-      if(b.type==='p') html+=`<div class="glass"><p>${esc(b.content)}</p></div>`;
-      else if(b.type==='list'){
-        html+=`<ul class="glass-list">`;
-        b.content.forEach(l=>html+=`<li>${esc(l)}</li>`);
-        html+=`</ul>`;
-      }
-      else if(b.type==='mermaid'){
-        html+=`<div class="mermaid-glass"><div class="mermaid" id="mm${i}">${esc(b.content)}</div></div>`;
-      }
-      else if(b.type==='table') html+=renderTable(b.content);
-      else if(b.type==='code'){
-        html+=`<div class="accordion" id="acc${i}_${accordionIdx}">`;
-        html+=`<div class="accordion-header" onclick="toggleAccordion('acc${i}_${accordionIdx}')">`;
-        html+=`<span>💻 코드 보기</span><span class="accordion-arrow">▼</span></div>`;
-        html+=`<div class="accordion-body"><div class="code-glass"><pre>${esc(b.content)}</pre></div></div></div>`;
-        accordionIdx++;
-      }
-    }
-
-    // 인포그래픽 자동 감지: 숫자 패턴
-    const nums=extractNumbers(s);
-    if(nums.length>=2){
-      html+=`<div class="info-grid">`;
-      nums.forEach(n=>html+=`<div class="info-tile"><div class="val">${n.val}</div><div class="lbl">${n.lbl}</div></div>`);
-      html+=`</div>`;
-    }
-
-    html+=`</div></section>`;
-    return html;
-  }).join('');
-
-  // Mermaid
-  setTimeout(async()=>{
-    for(const el of document.querySelectorAll('.mermaid')){
-      try{const{svg}=await mermaid.render('mm_'+Math.random().toString(36).slice(2),el.textContent);el.innerHTML=svg}
-      catch(e){el.innerHTML='<p style=color:var(--red)>Diagram error</p>'}
-    }
-  },200);
-}
-
-function extractNumbers(s){
-  const nums=[];
-  const text=s.title+' '+s.blocks.filter(b=>b.type==='p').map(b=>b.content).join(' ');
-  // "28개" "27🔒" 같은 패턴
-  const m1=text.match(/(\d+)\s*(개|종|레포|🔒|🌐)/g);
-  if(m1) m1.forEach(m=>{const v=m.match(/(\d+)/);if(v)nums.push({val:v[1],lbl:m.replace(v[1],'').trim()});});
-  return nums.slice(0,6);
-}
-
-function renderTable(text){
-  const lines=text.trim().split('\n');
-  if(lines.length<2)return'';
-  const parseRow=l=>l.split('|').filter(c=>c.trim()).map(c=>c.trim());
-  const header=parseRow(lines[0]);
-  const rows=lines.slice(2).map(parseRow);
-  let h='<div class="table-glass"><table><thead><tr>';
-  header.forEach(c=>h+=`<th>${esc(c)}</th>`);
-  h+='</tr></thead><tbody>';
-  rows.forEach(r=>{h+='<tr>';r.forEach(c=>h+=`<td>${esc(c)}</td>`);h+='</tr>'});
-  h+='</tbody></table></div>';
-  return h;
-}
-
-// 아코디언
-function toggleAccordion(id){document.getElementById(id).classList.toggle('open')}
-
-// 내비
-function renderNavDots(){
-  document.getElementById('navDots').innerHTML=SECTIONS.map((_,i)=>
-    `<div class="nav-dot" id="dot${i}" onclick="goTo(${i})" title="${SECTIONS[i].title.substring(0,30)}"></div>`).join('');
-}
-function updateNav(){
-  document.querySelectorAll('.nav-dot').forEach((d,i)=>{d.classList.toggle('active',i===idx);d.classList.toggle('done',i<idx)});
-  document.getElementById('progressBar').style.width=((idx+1)/SECTIONS.length*100)+'%';
-}
-function goTo(i){
-  document.querySelectorAll('.slide')[i]?.scrollIntoView({behavior:'smooth'});
-  idx=i;updateNav();
-}
-
-// TTS
-function speak(text){
-  return new Promise(resolve=>{
-    if(!window.speechSynthesis){setTimeout(resolve,text.length*55);return}
-    const u=new SpeechSynthesisUtterance(text.substring(0,2000));
-    const voices=speechSynthesis.getVoices();
-    const kr=voices.filter(v=>v.lang.startsWith('ko'));
-    if(kr.length)u.voice=kr[0];
-    u.rate=0.92;u.pitch=1;
-    u.onend=()=>resolve();u.onerror=()=>resolve();
-    speechSynthesis.speak(u);
-  });
-}
-async function readSection(i){
-  const s=SECTIONS[i];
-  let text=s.title+'. ';
-  for(const b of s.blocks){
-    if(b.type==='p')text+=b.content+'. ';
-    else if(b.type==='list')text+=b.content.join('. ')+'. ';
-  }
-  document.getElementById('ttsBadge').classList.add('on');
-  goTo(i);
-  await speak(text);
-  document.getElementById('ttsBadge').classList.remove('on');
-}
-
-// Play All
-async function togglePlay(){
-  if(playing){stopPlay();return}
-  playing=true;
-  const btn=document.getElementById('playBtn');
-  btn.textContent='⏸ Stop';btn.classList.add('playing');
-  for(let i=idx;i<SECTIONS.length;i++){
-    if(!playing)break;
-    await readSection(i);
-    if(i<SECTIONS.length-1&&playing)await new Promise(r=>setTimeout(r,600));
-  }
-  if(playing)stopPlay();
-}
-function stopPlay(){
-  playing=false;window.speechSynthesis?.cancel();
-  const btn=document.getElementById('playBtn');
-  btn.textContent='▶ Play All';btn.classList.remove('playing');
-  document.getElementById('ttsBadge').classList.remove('on');
-}
-
-// 영상 익스포트
-async function exportVideo(){
-  const btn=event.target;btn.textContent='⏳';btn.disabled=true;
-  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
-  const ctx=canvas.getContext('2d');
-  const stream=canvas.captureStream(30);
-  const chunks=[];const rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9'});
-  rec.ondataavailable=e=>chunks.push(e.data);rec.start();
-
-  for(let i=0;i<SECTIONS.length;i++){
-    const s=SECTIONS[i];
-    const grad=ctx.createLinearGradient(0,0,0,1280);
-    grad.addColorStop(0,'#050510');grad.addColorStop(0.5,'#0a0a20');grad.addColorStop(1,'#050510');
-    ctx.fillStyle=grad;ctx.fillRect(0,0,720,1280);
-
-    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.beginPath();
-    ctx.roundRect(30,30,660,1220,20);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(30,30,660,1220,20);ctx.stroke();
-
-    ctx.fillStyle='#818cf8';ctx.font='11px system-ui';ctx.fillText(f'SECTION ${i+1}/${SECTIONS.length}',60,80);
-
-    ctx.fillStyle='#e8e8f0';ctx.font='bold 30px system-ui';
-    const tl=wrapText(ctx,s.title,600);
-    tl.forEach((l,j)=>ctx.fillText(l,60,140+j*42));
-
-    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='19px system-ui';
-    let y=140+tl.length*42+30;
-    for(const b of s.blocks){
-      let t='';if(b.type==='p')t=b.content;else if(b.type==='list')t=b.content.join('. ');
-      if(t){const bl=wrapText(ctx,t.substring(0,250),600);bl.slice(0,6).forEach(l=>{if(y<1180){ctx.fillText(l,60,y);y+=28}});}
-    }
-
-    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(30,1230,660,3);
-    ctx.fillStyle='#818cf8';ctx.fillRect(30,1230,660*(i+1)/SECTIONS.length,3);
-    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px system-ui';ctx.fillText(f'${i+1}/${SECTIONS.length}',650,1255);
-
-    await readSection(i);
-    if(i<SECTIONS.length-1)await new Promise(r=>setTimeout(r,300));
-  }
-  ctx.fillStyle='#050510';ctx.fillRect(0,0,720,1280);
-  ctx.fillStyle='#e8e8f0';ctx.font='bold 28px system-ui';ctx.fillText('✓ 완료',60,600);
-  await new Promise(r=>setTimeout(r,1500));
-  rec.stop();await new Promise(r=>rec.onstop=r);
-
-  const blob=new Blob(chunks,{type:'video/webm'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='helena-studio.webm';a.click();
-  btn.textContent='📥 저장';btn.disabled=false;
-}
-
-function wrapText(ctx,text,maxW){
-  const words=text.split(' '),lines=[];let line='';
-  for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t}
-  if(line)lines.push(line);return lines;
-}
-function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-</script>
-</body></html>
+</body>
+</html>
