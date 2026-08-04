@@ -2,9 +2,13 @@
   "name": "helena-programming",
   "version": 2,
   "builds": [
-    { "src": "index.html", "use": "@vercel/static" }
+    { "src": "**/*", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/manifest.json", "dest": "/manifest.json" },
+    { "src": "/favicon.svg", "dest": "/favicon.svg" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
