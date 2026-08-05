@@ -66,7 +66,6 @@ jobs:
           import os, sys, glob, traceback
           try:
               from basic_pitch.inference import predict
-              from basic_pitch import ICASSP_2022_MODEL_PATH
               import pretty_midi, numpy as np, soundfile as sf, librosa
 
               audio_files = glob.glob("pipelines/audio/input.*")
@@ -82,12 +81,10 @@ jobs:
               print(f"   Resampled: {len(y)/sr:.1f}s, {sr}Hz")
 
               print("🎹 basic-pitch predict()...")
-              print(f"   model={ICASSP_2022_MODEL_PATH}")
               sys.stdout.flush()
 
               model_output, midi_data, note_events = predict(
                   tmp_wav,
-                  model_path=ICASSP_2022_MODEL_PATH,
                   onset_threshold=float(os.environ.get("ONSET_THRESHOLD", "0.45")),
                   minimum_note_length=float(os.environ.get("MIN_NOTE_LEN", "0.08")),
                   minimum_frequency=50,
