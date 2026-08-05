@@ -39,38 +39,60 @@ jobs:
       - name: Download audio
         run: |
           mkdir -p pipelines/audio
-          if [ -n "${{ github.event.inputs.youtube_url }}" ]; then
-            echo "📥 YouTube → WAV"
-            yt-dlp -x --audio-format wav --audio-quality 0 \
-              -o "pipelines/audio/input.%(ext)s" \
-              "${{ github.event.inputs.youtube_url }}"
-          elif [ ! -f pipelines/audio/input.wav ]; then
-            echo "❌ URL도 없고 pipelines/audio/input.wav 도 없음"
-            exit 1
-          else
+          INPUT="${{ github.event.inputs.youtube_url }}"
+          if [ -n "$INPUT" ]; then
+            if echo "$INPUT" | grep -q '^https://github.com/.*releases/download/'; then
+              echo "📥 GitHub Release → MP3"
+              curl -sL -o pipelines/audio/input.mp3 "$INPUT"
+            else
+              echo "📥 YouTube → WAV"
+              yt-dlp -x --audio-format wav --audio-quality 0 \
+                -o "pipelines/audio/input.%(ext)s" \
+                "$INPUT" || { echo "⚠️ yt-dlp failed, trying direct download..."; exit 1; }
+            fi
+          elif [ -f pipelines/audio/input.mp3 ]; then
+            echo "✅ pipelines/audio/input.mp3 사용"
+          elif [ -f pipelines/audio/input.wav ]; then
             echo "✅ pipelines/audio/input.wav 사용"
+          else
+            echo "❌ URL도 없고 pipelines/audio/input.* 도 없음"
+            exit 1
           fi
           ls -lah pipelines/audio/
 
       - name: Extract MIDI (basic-pitch)
         run: |
           python3 << 'PYEOF'
-          import os, subprocess
+          import os, subprocess, glob
           from basic_pitch.inference import predict
           from basic_pitch import ICASSP_2022_MODEL_PATH
           import pretty_midi
           import numpy as np
           import soundfile as sf
+          import librosa
 
-          input_wav = 'pipelines/audio/input.wav'
+          # Find input audio
+          audio_files = glob.glob('pipelines/audio/input.*')
+          if not audio_files:
+              print("❌ No input audio found")
+              exit(1)
+          input_audio = audio_files[0]
           output_mid = 'pipelines/audio/output.mid'
+
+          print(f"📥 Loading: {input_audio}")
+
+          # basic-pitch needs .wav at the right sample rate
+          y, sr = librosa.load(input_audio, sr=22050, mono=True)
+          tmp_wav = 'pipelines/audio/_input_22k.wav'
+          sf.write(tmp_wav, y, sr)
+          print(f"   Resampled: {len(y)/sr:.1f}s, {sr}Hz")
 
           print("🎹 basic-pitch MIDI extraction...")
           model_output, midi_data, note_events = predict(
-              input_wav,
+              tmp_wav,
               model_path=ICASSP_2022_MODEL_PATH,
-              onset_threshold=float(os.environ.get('ONSET_THRESHOLD', '0.5')),
-              minimum_note_length=float(os.environ.get('MIN_NOTE_LEN', '0.1')),
+              onset_threshold=float(os.environ.get('ONSET_THRESHOLD', '0.45')),
+              minimum_note_length=float(os.environ.get('MIN_NOTE_LEN', '0.08')),
               minimum_frequency=50,
               maximum_frequency=4000,
           )
@@ -80,7 +102,6 @@ jobs:
           print(f"   Notes: {len(note_events)}")
           print(f"   Duration: {midi_data.get_end_time():.1f}s")
 
-          # Also log note details
           for i, note in enumerate(note_events[:10]):
               print(f"   Note {i}: pitch={note[1]}, vel={note[2]}, start={note[0]:.2f}, end={note[3]:.2f}")
           if len(note_events) > 10:
