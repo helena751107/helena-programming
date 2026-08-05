@@ -34,6 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt install -y ffmpeg
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install yt-dlp pretty_midi librosa soundfile
           pip install piano_transcription_inference
 
