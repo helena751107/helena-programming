@@ -1,0 +1,106 @@
+# 🎹 Audio → MIDI extraction (basic-pitch, polyphonic)
+# 사용법: Actions 탭 → "Extract MIDI" → Run workflow → URL 입력
+# 결과: Artifact로 MIDI 다운로드
+
+name: Extract MIDI
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: 'YouTube URL (또는 비워두면 pipelines/audio/input.mp3 사용)'
+        required: false
+        default: ''
+      onset_threshold:
+        description: 'Note onset threshold (0.1~0.9, 낮을수록 음 많이 잡음)'
+        required: false
+        default: '0.5'
+      min_note_len:
+        description: '최소 음 길이 (초)'
+        required: false
+        default: '0.1'
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update && sudo apt install -y ffmpeg
+          pip install yt-dlp basic-pitch pretty_midi librosa
+
+      - name: Download audio
+        run: |
+          mkdir -p pipelines/audio
+          if [ -n "${{ github.event.inputs.youtube_url }}" ]; then
+            echo "📥 YouTube → WAV"
+            yt-dlp -x --audio-format wav --audio-quality 0 \
+              -o "pipelines/audio/input.%(ext)s" \
+              "${{ github.event.inputs.youtube_url }}"
+          elif [ ! -f pipelines/audio/input.wav ]; then
+            echo "❌ URL도 없고 pipelines/audio/input.wav 도 없음"
+            exit 1
+          else
+            echo "✅ pipelines/audio/input.wav 사용"
+          fi
+          ls -lah pipelines/audio/
+
+      - name: Extract MIDI (basic-pitch)
+        run: |
+          python3 << 'PYEOF'
+          import os, subprocess
+          from basic_pitch.inference import predict
+          from basic_pitch import ICASSP_2022_MODEL_PATH
+          import pretty_midi
+          import numpy as np
+          import soundfile as sf
+
+          input_wav = 'pipelines/audio/input.wav'
+          output_mid = 'pipelines/audio/output.mid'
+
+          print("🎹 basic-pitch MIDI extraction...")
+          model_output, midi_data, note_events = predict(
+              input_wav,
+              model_path=ICASSP_2022_MODEL_PATH,
+              onset_threshold=float(os.environ.get('ONSET_THRESHOLD', '0.5')),
+              minimum_note_length=float(os.environ.get('MIN_NOTE_LEN', '0.1')),
+              minimum_frequency=50,
+              maximum_frequency=4000,
+          )
+
+          midi_data.write(output_mid)
+          print(f"✅ {output_mid}")
+          print(f"   Notes: {len(note_events)}")
+          print(f"   Duration: {midi_data.get_end_time():.1f}s")
+
+          # Also log note details
+          for i, note in enumerate(note_events[:10]):
+              print(f"   Note {i}: pitch={note[1]}, vel={note[2]}, start={note[0]:.2f}, end={note[3]:.2f}")
+          if len(note_events) > 10:
+              print(f"   ... and {len(note_events) - 10} more notes")
+          PYEOF
+        env:
+          ONSET_THRESHOLD: ${{ github.event.inputs.onset_threshold }}
+          MIN_NOTE_LEN: ${{ github.event.inputs.min_note_len }}
+
+      - name: Upload MIDI
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-midi
+          path: pipelines/audio/output.mid
+
+      - name: Commit MIDI to repo
+        run: |
+          cp pipelines/audio/output.mid pipelines/audio/extracted.mid
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add pipelines/audio/extracted.mid
+          git diff --staged --quiet || git commit -m "midi: extract from YouTube [skip ci]"
+          git push
