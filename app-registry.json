@@ -83,5 +83,47 @@
     "tech": "Python, edge-tts, ffmpeg",
     "verified_on": "2026-07-31",
     "verified_result": "46-fridge-architecture_Claude.md → 3.3MB MP3, 9.5분"
+  },
+  {
+    "id": "pipeline-audio",
+    "name": "오디오 렌더링 파이프",
+    "directory": "pipelines/audio",
+    "version": "0.1.0",
+    "status": "active",
+    "category": "pipeline",
+    "description": "FFmpeg + Reaper headless — .wav .rpp → MP3/OGG/FLAC 렌더링. Actions 7GB 러너.",
+    "icon_emoji": "🎵",
+    "workflow": "render-audio.yml",
+    "source_origin": "original",
+    "domains": ["cloud-cpu"],
+    "tech": "FFmpeg, SoX, Reaper Linux (xvfb)"
+  },
+  {
+    "id": "pipeline-cad",
+    "name": "CAD 파라메트릭 파이프",
+    "directory": "pipelines/cad",
+    "version": "0.1.0",
+    "status": "active",
+    "category": "pipeline",
+    "description": "FreeCAD Python 파라메트릭 모델링 → STL/STEP 출력. Actions 7GB 러너.",
+    "icon_emoji": "📐",
+    "workflow": "render-cad.yml",
+    "source_origin": "original",
+    "domains": ["cloud-cpu"],
+    "tech": "FreeCAD CLI, Python"
+  },
+  {
+    "id": "pipeline-compute",
+    "name": "범용 CPU 컴퓨트",
+    "directory": "pipelines/compute",
+    "version": "0.1.0",
+    "status": "active",
+    "category": "pipeline",
+    "description": "아무 Python·Shell 스크립트나 Actions 7GB 러너에서 실행. 빌드·분석·변환.",
+    "icon_emoji": "⚡",
+    "workflow": "compute.yml",
+    "source_origin": "original",
+    "domains": ["cloud-cpu"],
+    "tech": "Python 3, Shell, CMake, OpenCV"
   }
 ]

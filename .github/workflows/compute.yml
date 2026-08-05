@@ -1,0 +1,58 @@
+# 범용 CPU 컴퓨트 — 아무 파이썬·쉘 스크립트나 Actions 7GB 러너에서 실행
+# 트리거: 수동 또는 pipelines/compute/** 변경 시
+
+name: CPU Compute
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: '실행할 명령어 (예: bash build.sh, python3 analyze.py)'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'pipelines/compute/**'
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup compute environment
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential python3 python3-pip \
+            ffmpeg imagemagick git curl wget \
+            cmake ninja-build pkg-config \
+            mesa-utils xvfb
+
+      - name: Install Python packages
+        run: |
+          pip3 install numpy scipy matplotlib pillow requests opencv-python-headless
+
+      - name: Run compute task
+        run: |
+          cd pipelines/compute
+          chmod +x *.sh 2>/dev/null || true
+          chmod +x *.py 2>/dev/null || true
+
+          if [ -n "${{ github.event.inputs.command }}" ]; then
+            echo "▶ ${{ github.event.inputs.command }}"
+            eval "${{ github.event.inputs.command }}"
+          elif [ -f run.sh ]; then
+            bash run.sh
+          elif [ -f run.py ]; then
+            python3 run.py
+          else
+            echo "❌ 실행할 작업이 없습니다. command 입력, run.sh, 또는 run.py를 넣으세요."
+            exit 1
+          fi
+
+      - name: Upload compute output
+        uses: actions/upload-artifact@v4
+        with:
+          name: compute-output
+          path: pipelines/compute/out/

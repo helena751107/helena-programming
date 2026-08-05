@@ -1,0 +1,85 @@
+# 오디오 렌더링 (FFmpeg + Reaper headless)
+# 트리거: 수동 또는 pipelines/audio/** 변경 시
+
+name: Render Audio
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: '프로젝트 파일명 (pipelines/audio/ 내)'
+        required: false
+        default: ''
+      engine:
+        description: '렌더 엔진 (ffmpeg / reaper)'
+        required: false
+        default: 'ffmpeg'
+      format:
+        description: '출력 포맷 (mp3 / wav / flac / ogg)'
+        required: false
+        default: 'mp3'
+  push:
+    paths:
+      - 'pipelines/audio/**'
+
+jobs:
+  render-ffmpeg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt update && sudo apt install -y ffmpeg sox lame
+
+      - name: Render audio with FFmpeg
+        run: |
+          cd pipelines/audio
+          chmod +x *.sh 2>/dev/null || true
+          # 자동: render.sh 있으면 실행, 없으면 모든 .wav → .mp3 변환
+          if [ -f render.sh ]; then
+            bash render.sh
+          else
+            mkdir -p out
+            for f in *.wav *.flac *.aiff 2>/dev/null; do
+              [ -f "$f" ] || continue
+              name="${f%.*}"
+              ffmpeg -i "$f" -b:a 320k "out/${name}.mp3" -y
+              echo "✅ $f → out/${name}.mp3"
+            done
+          fi
+
+      - name: Upload rendered audio
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-output-ffmpeg
+          path: pipelines/audio/out/
+
+  render-reaper:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.engine == 'reaper'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Reaper headless
+        run: |
+          sudo apt update && sudo apt install -y xvfb libasound2 libgtk-3-0
+          # Reaper Linux (무료 평가판, 60일)
+          wget -q https://www.reaper.fm/files/7.x/reaper717_linux_x86_64.tar.xz
+          tar xf reaper717_linux_x86_64.tar.xz
+          echo "REAPER=$(pwd)/reaper_linux_x86_64/REAPER/reaper" >> $GITHUB_ENV
+
+      - name: Render RPP project
+        run: |
+          cd pipelines/audio
+          PROJECT="${PROJECT:-*.rpp}"
+          # xvfb-run으로 가상 디스플레이 제공 (Reaper는 헤드리스에서도 X 필요)
+          xvfb-run -a $REAPER -renderproject "$PROJECT"
+        env:
+          PROJECT: ${{ github.event.inputs.project }}
+
+      - name: Upload rendered audio
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-output-reaper
+          path: pipelines/audio/out/

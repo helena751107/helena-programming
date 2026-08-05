@@ -1,0 +1,54 @@
+# FreeCAD 파라메트릭 모델링 (CLI)
+# 트리거: 수동 또는 pipelines/cad/** 변경 시
+
+name: Render CAD
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: '실행할 Python 스크립트 (pipelines/cad/ 내)'
+        required: false
+        default: ''
+      format:
+        description: '출력 포맷 (stl / step / obj / fcstd)'
+        required: false
+        default: 'stl'
+  push:
+    paths:
+      - 'pipelines/cad/**'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install FreeCAD
+        run: |
+          sudo apt update && sudo apt install -y freecad
+          # freecadcmd = CLI 모드 (GUI 없음)
+          freecadcmd --version || echo "FreeCAD CLI ready"
+
+      - name: Execute CAD script
+        run: |
+          cd pipelines/cad
+          mkdir -p out
+
+          if [ -n "${{ github.event.inputs.script }}" ]; then
+            SCRIPT="${{ github.event.inputs.script }}"
+          elif [ -f render.py ]; then
+            SCRIPT="render.py"
+          else
+            echo "❌ 실행할 스크립트가 없습니다. render.py를 만들거나 입력으로 지정하세요."
+            exit 1
+          fi
+
+          echo "▶ freecadcmd $SCRIPT"
+          xvfb-run -a freecadcmd "$SCRIPT"
+
+      - name: Upload CAD output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cad-output
+          path: pipelines/cad/out/
