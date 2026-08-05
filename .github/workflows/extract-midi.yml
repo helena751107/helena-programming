@@ -62,51 +62,49 @@ jobs:
 
       - name: Extract MIDI (basic-pitch)
         run: |
-          python3 << 'PYEOF'
-          import os, subprocess, glob
-          from basic_pitch.inference import predict
-          from basic_pitch import ICASSP_2022_MODEL_PATH
-          import pretty_midi
-          import numpy as np
-          import soundfile as sf
-          import librosa
+          python3 -c '
+          import os, sys, glob, traceback
+          try:
+              from basic_pitch.inference import predict
+              from basic_pitch import ICASSP_2022_MODEL_PATH
+              import pretty_midi, numpy as np, soundfile as sf, librosa
 
-          # Find input audio
-          audio_files = glob.glob('pipelines/audio/input.*')
-          if not audio_files:
-              print("❌ No input audio found")
-              exit(1)
-          input_audio = audio_files[0]
-          output_mid = 'pipelines/audio/output.mid'
+              audio_files = glob.glob("pipelines/audio/input.*")
+              if not audio_files:
+                  print("❌ No input audio"); sys.exit(1)
+              input_audio = audio_files[0]
+              output_mid = "pipelines/audio/output.mid"
+              print(f"📥 Loading: {input_audio}")
 
-          print(f"📥 Loading: {input_audio}")
+              y, sr = librosa.load(input_audio, sr=22050, mono=True)
+              tmp_wav = "pipelines/audio/_input_22k.wav"
+              sf.write(tmp_wav, y, sr)
+              print(f"   Resampled: {len(y)/sr:.1f}s, {sr}Hz")
 
-          # basic-pitch needs .wav at the right sample rate
-          y, sr = librosa.load(input_audio, sr=22050, mono=True)
-          tmp_wav = 'pipelines/audio/_input_22k.wav'
-          sf.write(tmp_wav, y, sr)
-          print(f"   Resampled: {len(y)/sr:.1f}s, {sr}Hz")
+              print("🎹 basic-pitch predict()...")
+              print(f"   model={ICASSP_2022_MODEL_PATH}")
+              sys.stdout.flush()
 
-          print("🎹 basic-pitch MIDI extraction...")
-          model_output, midi_data, note_events = predict(
-              tmp_wav,
-              model_path=ICASSP_2022_MODEL_PATH,
-              onset_threshold=float(os.environ.get('ONSET_THRESHOLD', '0.45')),
-              minimum_note_length=float(os.environ.get('MIN_NOTE_LEN', '0.08')),
-              minimum_frequency=50,
-              maximum_frequency=4000,
-          )
+              model_output, midi_data, note_events = predict(
+                  tmp_wav,
+                  model_path=ICASSP_2022_MODEL_PATH,
+                  onset_threshold=float(os.environ.get("ONSET_THRESHOLD", "0.45")),
+                  minimum_note_length=float(os.environ.get("MIN_NOTE_LEN", "0.08")),
+                  minimum_frequency=50,
+                  maximum_frequency=4000,
+              )
 
-          midi_data.write(output_mid)
-          print(f"✅ {output_mid}")
-          print(f"   Notes: {len(note_events)}")
-          print(f"   Duration: {midi_data.get_end_time():.1f}s")
-
-          for i, note in enumerate(note_events[:10]):
-              print(f"   Note {i}: pitch={note[1]}, vel={note[2]}, start={note[0]:.2f}, end={note[3]:.2f}")
-          if len(note_events) > 10:
-              print(f"   ... and {len(note_events) - 10} more notes")
-          PYEOF
+              midi_data.write(output_mid)
+              print(f"✅ {output_mid}")
+              print(f"   Notes: {len(note_events)}")
+              print(f"   Duration: {midi_data.get_end_time():.1f}s")
+              for i, n in enumerate(note_events[:5]):
+                  print(f"   Note {i}: pitch={n[1]}, start={n[0]:.2f}")
+          except Exception as e:
+              traceback.print_exc()
+              print(f"❌ {e}")
+              sys.exit(1)
+          '
         env:
           ONSET_THRESHOLD: ${{ github.event.inputs.onset_threshold }}
           MIN_NOTE_LEN: ${{ github.event.inputs.min_note_len }}
