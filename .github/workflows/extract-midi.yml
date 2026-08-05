@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt update && sudo apt install -y ffmpeg
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install yt-dlp pretty_midi librosa soundfile
+          pip install "librosa<0.10" yt-dlp pretty_midi soundfile
           pip install piano_transcription_inference
 
       - name: Download audio
@@ -67,62 +67,49 @@ jobs:
           python3 -c '
           import os, sys, glob, traceback
           try:
-              import librosa, soundfile as sf, pretty_midi, numpy as np
-              from piano_transcription_inference import PianoTranscription, sample_rate, load_audio
+              import soundfile as sf, pretty_midi, numpy as np, librosa
+              from piano_transcription_inference import PianoTranscription, sample_rate
 
               audio_files = glob.glob("pipelines/audio/input.*")
               if not audio_files: print("❌ No input"); sys.exit(1)
               input_audio = audio_files[0]
               output_mid = "pipelines/audio/output.mid"
 
-              print(f"📥 Loading: {input_audio}")
-              audio, _ = load_audio(input_audio, sr=sample_rate, mono=True)
-              print(f"   {len(audio)/sample_rate:.1f}s, {sample_rate}Hz")
+              # Load audio with soundfile (bypass librosa version issues)
+              y, sr = sf.read(input_audio, dtype="float32", always_2d=False)
+              if y.ndim > 1: y = y.mean(axis=1)
+              if sr != sample_rate:
+                  y = librosa.resample(y, orig_sr=sr, target_sr=sample_rate)
+              print(f"📥 Loaded: {len(y)/sample_rate:.1f}s, {sample_rate}Hz")
 
               print("🎹 piano_transcription (ByteDance SOTA)...")
               sys.stdout.flush()
               transcriber = PianoTranscription(device="cpu")
-              trans_dict = transcriber.transcribe(audio, output_mid)
+              trans_dict = transcriber.transcribe(y, output_mid)
 
-              # Load result and show stats
               midi = pretty_midi.PrettyMIDI(output_mid)
               notes = midi.instruments[0].notes if midi.instruments else []
-              print(f"✅ {output_mid}")
-              print(f"   Notes: {len(notes)}")
-              print(f"   Duration: {midi.get_end_time():.1f}s")
+              print(f"✅ {output_mid}  Notes: {len(notes)}  Dur: {midi.get_end_time():.1f}s")
 
-              # Quality filtering (post-processing)
-              on_th = float(os.environ.get("ONSET_THRESHOLD", "0.45"))
+              # Filter + 60s best clip
               min_dur = float(os.environ.get("MIN_NOTE_LEN", "0.08"))
               good = [n for n in notes if n.velocity >= 30 and (n.end-n.start) >= min_dur]
-
-              # Find best 60s segment
               seg = {}
+              for n in good: s = int(n.start/10)*10; seg[s] = seg.get(s, 0) + 1
+              best = max(seg, key=seg.get) if seg else 0
+              clip_notes = []
               for n in good:
-                  s = int(n.start/10)*10
-                  seg[s] = seg.get(s, 0) + 1
-              if seg:
-                  best = max(seg, key=seg.get)
-                  clip_notes = []
-                  for n in good:
-                      t = n.start - best
-                      if 0 <= t <= 60:
-                          n.start = t
-                          n.end = min(t+(n.end-n.start), 60)
-                          clip_notes.append(n)
-                  clip = pretty_midi.PrettyMIDI()
-                  clip.instruments.append(pretty_midi.Instrument(program=0, name="Piano"))
-                  clip.instruments[0].notes = clip_notes
-                  clip_path = "pipelines/audio/output_clean.mid"
-                  clip.write(clip_path)
-                  print(f"   Best 60s: {best}s~{best+60}s, {len(clip_notes)} notes ({len(clip_notes)/60:.1f}/s)")
-              else:
-                  print("   ⚠️ No notes after filtering")
-
-              print(f"   Raw notes: {len(notes)}")
-              print(f"   Filtered (vel>=30): {len(good)}")
-              for n in sorted(notes, key=lambda x: x.velocity, reverse=True)[:5]:
-                  print(f"     pitch={n.pitch} vel={n.velocity} start={n.start:.1f}s")
+                  t = n.start - best
+                  if 0 <= t <= 60:
+                      n.start = t; n.end = min(t+(n.end-n.start), 60)
+                      clip_notes.append(n)
+              clip = pretty_midi.PrettyMIDI()
+              clip.instruments.append(pretty_midi.Instrument(program=0, name="Piano"))
+              clip.instruments[0].notes = clip_notes
+              clip_path = "pipelines/audio/output_clean.mid"
+              clip.write(clip_path)
+              print(f"   Clean: {len(clip_notes)} notes in 60s ({best}s~{best+60}s)")
+              print(f"   Velocities: {np.mean([n.velocity for n in clip_notes]):.0f} avg")
           except Exception as e:
               traceback.print_exc(); print(f"❌ {e}"); sys.exit(1)
           '
