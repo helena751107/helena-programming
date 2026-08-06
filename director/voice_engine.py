@@ -378,6 +378,32 @@ async def synthesize_beat(
     raise RuntimeError(f"all tts providers failed: {last_err}")
 
 
+def synthesize(text: str, dest: Path, engine: str = "auto") -> tuple[float, str]:
+    """간편 진입점 — produce_pd.sh 등에서 호출.
+
+    Returns (duration_sec, provider_id).
+    engine: auto | grok | local | openai | edge
+
+    내부적으로 synthesize_beat() 에 위임.
+    """
+    import tempfile
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    raw_dest = Path(tempfile.mktemp(suffix=".mp3", prefix="voice_raw_"))
+
+    try:
+        dur, prov = asyncio.run(synthesize_beat(
+            text,
+            dest=dest,
+            raw_dest=raw_dest,
+            prefer=engine,
+        ))
+        return dur, prov
+    finally:
+        if raw_dest.exists():
+            raw_dest.unlink(missing_ok=True)
+
+
 def multi_click_pad(n_clicks: int, base_hold_ms: int = 400) -> float:
     """Airtime so act never drops 2nd click — pro: breath room without 2× overshoot."""
     pad = base_hold_ms / 1000.0
