@@ -148,8 +148,9 @@ def _find_parksytts_root() -> Path | None:
     """ParksyTTS v1 설치 경로 자동 탐지."""
     candidates = [
         Path("/root/work/helena-programming/parksy-tts-v1"),
+        Path("/root/work/parksy-tts-v1/helena-programming/parksy-tts-v1"),
         Path("/root/work/parksy-tts-v1"),
-        Path(__file__).resolve().parents[1] / "parksy-tts-v1",
+        Path.home() / "parksy-tts-v1",
     ]
     for c in candidates:
         if (c / "say.py").exists() or (c / "core" / "engine.py").exists():
@@ -179,6 +180,7 @@ def _tts_local_parksy(text: str, dest: Path) -> float:
     """ParksyTTS v1 — GPT-SoVITS v2Pro 기반 박씨 목소리.
 
     parksy-tts-v1/say.py 를 호출. 설치돼 있지 않으면 RuntimeError.
+    say.py API: python3 say.py "text" --out output.wav
     """
     root = _find_parksytts_root()
     if root is None:
@@ -188,41 +190,38 @@ def _tts_local_parksy(text: str, dest: Path) -> float:
         )
     say_py = root / "say.py"
     if not say_py.exists():
-        # fallback: core/engine.py 직접 호출
-        engine_py = root / "core" / "engine.py"
-        if not engine_py.exists():
-            raise RuntimeError(f"ParksyTTS entrypoint missing: {root}")
-        cmd = [sys.executable, str(engine_py), "--text", text, "--out", str(dest)]
-    else:
-        cmd = [sys.executable, str(say_py), text]
+        raise RuntimeError(f"ParksyTTS entrypoint missing: {root}/say.py")
 
-    # say.py 는 .wav 출력 → ffmpeg mp3 변환
-    wav_dest = dest.with_suffix(".wav")
     dest.parent.mkdir(parents=True, exist_ok=True)
+    wav_dest = dest.with_suffix(".wav")
+
+    cmd = [
+        sys.executable, str(say_py),
+        text,
+        "--out", str(wav_dest),
+        "--lang", os.environ.get("PARKSY_TTS_LANG", "ko"),
+        "--speed", os.environ.get("PARKSY_TTS_SPEED", "1.0"),
+    ]
 
     env = os.environ.copy()
-    r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(root))
+    r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(root),
+                       timeout=300)
     if r.returncode != 0:
         raise RuntimeError(f"ParksyTTS failed: {r.stderr.strip() or r.stdout.strip()}")
 
-    # say.py "text" → 현재 디렉토리에 output.wav 생성하는 패턴 지원
-    default_wav = root / "output.wav"
-    actual_wav: Path | None = None
-    for candidate in [wav_dest, default_wav, dest.with_suffix(".wav")]:
-        if candidate.exists() and candidate.stat().st_size > 100:
-            actual_wav = candidate
-            break
-    if actual_wav is None:
-        # 혹시 mp3 직접 출력?
-        if dest.exists() and dest.stat().st_size > 200:
-            return ffprobe_duration(dest)
-        raise RuntimeError("ParksyTTS produced no output file")
+    # say.py --out 으로 직접 WAV 출력 → WAV → MP3 변환
+    if not wav_dest.exists() or wav_dest.stat().st_size < 100:
+        # fallback: /tmp/parksy_say.wav (say.py 기본 출력)
+        default_wav = Path("/tmp/parksy_say.wav")
+        if default_wav.exists() and default_wav.stat().st_size > 100:
+            wav_dest = default_wav
+        else:
+            raise RuntimeError("ParksyTTS produced no output file")
 
-    # WAV → MP3 변환
     r2 = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(actual_wav),
+        ["ffmpeg", "-y", "-i", str(wav_dest),
          "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-q:a", "3", str(dest)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, timeout=60,
     )
     if r2.returncode != 0 or not dest.exists() or dest.stat().st_size < 200:
         raise RuntimeError(f"ParksyTTS wav→mp3 failed: {r2.stderr}")
