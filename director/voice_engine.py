@@ -2,9 +2,14 @@
 """
 Voice engine — community A-bar (Purple Owl / playwright-recast style).
 
-Priority:
-  1) OpenAI tts-1-hd  if OPENAI_API_KEY set
-  2) edge-tts + broadcast humanize (always free fallback)
+Priority (auto):
+  1) Grok / xAI TTS (ara/eve/…) — SuperGrok 성우 본체
+  2) local — ParksyTTS v1 (GPT-SoVITS) → Sherpa-ONNX (Kokoro) 폴백
+  3) OpenAI tts-1-hd  if OPENAI_API_KEY set
+  4) edge-tts + broadcast humanize — last-resort fallback only
+
+TTS_ENGINE=local → 오프라인 전용 (ParksyTTS 우선, Sherpa 폴백)
+TTS_ENGINE=grok|openai|edge → 해당 엔진만 사용
 
 Also: multi-click pad, loudnorm chain.
 """
@@ -14,10 +19,12 @@ import asyncio
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 VOICE_DEFAULT = "ko-KR-SunHiNeural"
 OPENAI_VOICE_DEFAULT = "nova"  # multilingual OK for short KO lines
+GROK_VOICE_DEFAULT = os.environ.get("GROK_TTS_VOICE", "ara")
 
 
 def ffprobe_duration(path: Path) -> float:
@@ -107,6 +114,219 @@ def tts_openai(text: str, dest: Path, voice: str | None = None) -> float:
     return ffprobe_duration(dest)
 
 
+def tts_grok(text: str, dest: Path, voice: str | None = None) -> float:
+    """Grok xAI TTS — scripts/grok_tts.py (session JWT or XAI_API_KEY)."""
+    root = Path(__file__).resolve().parents[2]  # helena-programming/..
+    script = root / "scripts" / "grok_tts.py"
+    if not script.exists():
+        script = Path("/root/work/scripts/grok_tts.py")
+    if not script.exists():
+        raise RuntimeError("grok_tts.py not found")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        str(script),
+        "--text",
+        text,
+        "--out",
+        str(dest),
+        "--voice",
+        voice or GROK_VOICE_DEFAULT,
+        "--lang",
+        os.environ.get("GROK_TTS_LANG", "ko"),
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not dest.exists() or dest.stat().st_size < 200:
+        raise RuntimeError(r.stderr.strip() or r.stdout.strip() or "grok tts failed")
+    return ffprobe_duration(dest)
+
+
+# ── local / offline providers ──────────────────────────────────────────
+
+
+def _find_parksytts_root() -> Path | None:
+    """ParksyTTS v1 설치 경로 자동 탐지."""
+    candidates = [
+        Path("/root/work/helena-programming/parksy-tts-v1"),
+        Path("/root/work/parksy-tts-v1"),
+        Path(__file__).resolve().parents[1] / "parksy-tts-v1",
+    ]
+    for c in candidates:
+        if (c / "say.py").exists() or (c / "core" / "engine.py").exists():
+            return c
+    return None
+
+
+def _find_sherpa_model() -> Path | None:
+    """voice_models/ 에서 .onnx 모델 자동 탐지."""
+    model_env = os.environ.get("LOCAL_VOICE_MODEL", "")
+    if model_env and Path(model_env).exists():
+        return Path(model_env)
+    candidates = [
+        Path("/root/work/helena-programming/voice_models"),
+        Path("/root/work/voice_models"),
+        Path(__file__).resolve().parents[1] / "voice_models",
+    ]
+    for d in candidates:
+        if d.is_dir():
+            onnx_files = sorted(d.glob("*.onnx"))
+            if onnx_files:
+                return onnx_files[0]
+    return None
+
+
+def _tts_local_parksy(text: str, dest: Path) -> float:
+    """ParksyTTS v1 — GPT-SoVITS v2Pro 기반 박씨 목소리.
+
+    parksy-tts-v1/say.py 를 호출. 설치돼 있지 않으면 RuntimeError.
+    """
+    root = _find_parksytts_root()
+    if root is None:
+        raise RuntimeError(
+            "ParksyTTS v1 not found. "
+            "Clone gift/parksy-tts-v1 or run install.sh first."
+        )
+    say_py = root / "say.py"
+    if not say_py.exists():
+        # fallback: core/engine.py 직접 호출
+        engine_py = root / "core" / "engine.py"
+        if not engine_py.exists():
+            raise RuntimeError(f"ParksyTTS entrypoint missing: {root}")
+        cmd = [sys.executable, str(engine_py), "--text", text, "--out", str(dest)]
+    else:
+        cmd = [sys.executable, str(say_py), text]
+
+    # say.py 는 .wav 출력 → ffmpeg mp3 변환
+    wav_dest = dest.with_suffix(".wav")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(root))
+    if r.returncode != 0:
+        raise RuntimeError(f"ParksyTTS failed: {r.stderr.strip() or r.stdout.strip()}")
+
+    # say.py "text" → 현재 디렉토리에 output.wav 생성하는 패턴 지원
+    default_wav = root / "output.wav"
+    actual_wav: Path | None = None
+    for candidate in [wav_dest, default_wav, dest.with_suffix(".wav")]:
+        if candidate.exists() and candidate.stat().st_size > 100:
+            actual_wav = candidate
+            break
+    if actual_wav is None:
+        # 혹시 mp3 직접 출력?
+        if dest.exists() and dest.stat().st_size > 200:
+            return ffprobe_duration(dest)
+        raise RuntimeError("ParksyTTS produced no output file")
+
+    # WAV → MP3 변환
+    r2 = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(actual_wav),
+         "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-q:a", "3", str(dest)],
+        capture_output=True, text=True,
+    )
+    if r2.returncode != 0 or not dest.exists() or dest.stat().st_size < 200:
+        raise RuntimeError(f"ParksyTTS wav→mp3 failed: {r2.stderr}")
+    return ffprobe_duration(dest)
+
+
+def _tts_local_sherpa(text: str, dest: Path,
+                       model_path: Path | None = None) -> float:
+    """Sherpa-ONNX 로컬 추론 — CPU NEON 가속, 오프라인.
+
+    Kokoro (한국어) / VITS 모델 지원.
+    voice_models/*.onnx 자동 탐지.
+    """
+    model_file = model_path or _find_sherpa_model()
+    if model_file is None:
+        raise RuntimeError(
+            "No .onnx model found in voice_models/. "
+            "Place a Sherpa-ONNX model or set LOCAL_VOICE_MODEL env."
+        )
+
+    tokens_file = model_file.with_suffix(".json")
+    if not tokens_file.exists():
+        # Kokoro 모델은 .json 토크나이저가 필요
+        tokens_file_candidates = list(model_file.parent.glob("*.json"))
+        if tokens_file_candidates:
+            tokens_file = tokens_file_candidates[0]
+        else:
+            raise RuntimeError(
+                f"No tokens file found for {model_file.name}. "
+                "Place a .json tokens file alongside the .onnx model."
+            )
+
+    import sherpa_onnx
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Kokoro 모델 설정
+        tts_config = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                kokoro=sherpa_onnx.OfflineTtsKokoroModelConfig(
+                    model=str(model_file),
+                    tokens=str(tokens_file),
+                    data_dir=str(model_file.parent),
+                ),
+            ),
+        )
+        tts = sherpa_onnx.OfflineTts(tts_config)
+    except Exception:
+        # VITS / 기타 모델 폴백
+        tts_config = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                    model=str(model_file),
+                    tokens=str(tokens_file),
+                    data_dir=str(model_file.parent),
+                ),
+            ),
+        )
+        tts = sherpa_onnx.OfflineTts(tts_config)
+
+    speed = float(os.environ.get("LOCAL_VOICE_SPEED", "0.95"))
+    audio = tts.generate(text, sid=0, speed=speed)
+
+    # sherpa_onnx 출력 → WAV 저장 → FFmpeg MP3
+    import soundfile as sf
+    wav_tmp = dest.with_suffix(".wav")
+    sf.write(str(wav_tmp), audio.samples, audio.sample_rate)
+
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(wav_tmp),
+         "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-q:a", "3", str(dest)],
+        capture_output=True, text=True,
+    )
+    if wav_tmp.exists():
+        wav_tmp.unlink()
+    if r.returncode != 0 or not dest.exists() or dest.stat().st_size < 200:
+        raise RuntimeError(f"Sherpa wav→mp3 failed: {r.stderr}")
+    return ffprobe_duration(dest)
+
+
+def tts_local(text: str, dest: Path, *,
+              model_path: Path | None = None) -> tuple[float, str]:
+    """로컬 TTS 디스패처 — ParksyTTS 우선, Sherpa-ONNX 폴백.
+
+    Returns (duration_sec, provider_id).
+    """
+    # 1) ParksyTTS v1 (GPT-SoVITS 박씨 목소리)
+    parksy_root = _find_parksytts_root()
+    if parksy_root is not None:
+        try:
+            dur = _tts_local_parksy(text, dest)
+            return dur, "local/parksytts-v1"
+        except Exception as e:
+            print(f"  ! local/parksytts failed, falling back to sherpa: {e}", flush=True)
+
+    # 2) Sherpa-ONNX (Kokoro / VITS)
+    dur = _tts_local_sherpa(text, dest, model_path=model_path)
+    model_name = (model_path or _find_sherpa_model()).stem if (
+        model_path or _find_sherpa_model()
+    ) else "unknown"
+    return dur, f"local/sherpa-{model_name}"
+
+
 async def synthesize_beat(
     text: str,
     *,
@@ -117,24 +337,46 @@ async def synthesize_beat(
 ) -> tuple[float, str]:
     """
     Returns (duration_sec, provider_id).
-    prefer: auto | edge | openai
+    prefer: auto | grok | local | openai | edge
     """
-    provider = "edge"
-    use_openai = prefer == "openai" or (
-        prefer == "auto" and bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_KEY"))
-    )
-    if use_openai:
-        try:
-            dur = await asyncio.to_thread(tts_openai, text, raw_dest)
-            provider = "openai-tts-1-hd"
-            humanize_tts(raw_dest, dest)  # light polish still helps
-            return ffprobe_duration(dest), provider
-        except Exception as e:
-            print(f"  ! openai tts fallback to edge: {e}", flush=True)
+    order: list[str]
+    if prefer == "auto":
+        # TTS_ENGINE 환경변수로 기본 엔진 지정 가능
+        engine_env = os.environ.get("TTS_ENGINE", "")
+        if engine_env:
+            order = [engine_env]
+        else:
+            order = ["grok", "openai", "edge"]
+    else:
+        order = [prefer]
 
-    dur = await tts_edge(text, edge_voice, raw_dest)
-    humanize_tts(raw_dest, dest)
-    return ffprobe_duration(dest), "edge+humanize"
+    last_err: Exception | None = None
+    for provider in order:
+        try:
+            if provider == "grok":
+                dur = await asyncio.to_thread(tts_grok, text, raw_dest)
+                # light polish only — Grok already broadcast-grade
+                humanize_tts(raw_dest, dest)
+                return ffprobe_duration(dest), f"grok-tts/{GROK_VOICE_DEFAULT}"
+            if provider == "local":
+                dur, prov_id = await asyncio.to_thread(tts_local, text, raw_dest)
+                humanize_tts(raw_dest, dest)
+                return ffprobe_duration(dest), prov_id
+            if provider == "openai":
+                if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_KEY")):
+                    continue
+                dur = await asyncio.to_thread(tts_openai, text, raw_dest)
+                humanize_tts(raw_dest, dest)
+                return ffprobe_duration(dest), "openai-tts-1-hd"
+            if provider == "edge":
+                dur = await tts_edge(text, edge_voice, raw_dest)
+                humanize_tts(raw_dest, dest)
+                return ffprobe_duration(dest), "edge+humanize"
+        except Exception as e:
+            last_err = e
+            print(f"  ! tts {provider} failed: {e}", flush=True)
+            continue
+    raise RuntimeError(f"all tts providers failed: {last_err}")
 
 
 def multi_click_pad(n_clicks: int, base_hold_ms: int = 400) -> float:
