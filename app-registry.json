@@ -125,5 +125,18 @@
     "source_origin": "original",
     "domains": ["cloud-cpu"],
     "tech": "Python 3, Shell, CMake, OpenCV"
+  },
+  {
+    "id": "pd-pipeline-mcp",
+    "name": "PD Pipeline MCP",
+    "directory": "mcp/pd_pipeline_mcp.py",
+    "version": "1.0.0",
+    "status": "active",
+    "category": "mcp",
+    "description": "숏폼 영상 제작 MCP 서버 — URL 파싱·VO 생성·연출 매핑·스크롤 캡처·TTS·Ken Burns·BGM·ASS 자막·TG 전송까지 produce_pd.sh 풀파이프라인 래퍼. pd_parse_url→pd_produce 원스톱.",
+    "icon_emoji": "🎬",
+    "source_origin": "original",
+    "domains": ["on-device", "mcp"],
+    "tech": "Python 3 stdlib, JSON-RPC STDIO/HTTP, Playwright, FFmpeg, Edge TTS"
   }
 ]
