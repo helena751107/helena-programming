@@ -269,11 +269,14 @@ def _tts_local_sherpa(text: str, dest: Path,
       4) voice_models/my_voice.onnx (기본 단일파일)
 
     Kokoro multi-lang bundle 구조:
-      kokoro-int8-multi-lang-v1_0/
-      ├── model.int8.onnx
+      kokoro-fp32-v1_0/
+      ├── model.onnx       (FP32 311MB — INT8은 ARM64 디퀀트 버그로 무음)
       ├── voices.bin
       ├── tokens.txt
       └── espeak-ng-data/
+
+    화자: jf_alpha (sid=37, 일본인 여성) — 한국어 발음에 부드러운 억양
+    "한국어를 배우는 착한 일본인 AI" 캐릭터성 → 차별화 자산 (2026-08-07 확정)
     """
     try:
         import sherpa_onnx
@@ -291,7 +294,7 @@ def _tts_local_sherpa(text: str, dest: Path,
     model_dir = None
     onnx_path = None
     tts_lang = os.environ.get("SHERPA_LANG", "ko")
-    tts_sid = int(os.environ.get("SHERPA_SID", "0"))
+    tts_sid = int(os.environ.get("SHERPA_SID", "37"))  # jf_alpha — 헬레나폰 AI 성우 기본 화자
 
     if model_path:
         p = Path(model_path)
@@ -534,12 +537,13 @@ def synthesize(
 
             elif provider == "local":
                 # ParksyTTS 우선 (GPT-SoVITS 선물 코어) → Sherpa-ONNX 폴백
-                # Fast pre-check: skip ParksyTTS if pytorch_lightning is missing
+                # Fast pre-check: skip ParksyTTS if pytorch_lightning missing or SHERPA_ONLY set
                 _has_parksy = False
-                try:
-                    from importlib.util import find_spec
-                    if find_spec("pytorch_lightning"):
-                        _has_parksy = True
+                if not os.environ.get("SHERPA_ONLY"):
+                    try:
+                        from importlib.util import find_spec
+                        if find_spec("pytorch_lightning"):
+                            _has_parksy = True
                 except Exception:
                     pass
 
